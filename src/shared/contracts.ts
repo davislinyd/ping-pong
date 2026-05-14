@@ -27,6 +27,19 @@ export type RuntimeConfigResponse = {
   clientSafety: ClientSafety;
 };
 
+export type ReportContextResponse = {
+  serverTime: string;
+  serverName: string;
+  requestHost: string;
+  requestProtocol: string;
+  clientIp: string;
+  coarseIp: string;
+  ipSource: "direct-request-ip" | "trusted-proxy-request-ip";
+  trustProxyAware: boolean;
+  browserFamily: string;
+  clientSafety: ClientSafety;
+};
+
 export type EditableRuntimeSettings = {
   testServerName: string;
   historyRetentionDays: number;
@@ -34,6 +47,7 @@ export type EditableRuntimeSettings = {
   parallelConnections: number;
   maxTestBytes: number;
   allowLocalSelfTest: boolean;
+  requireAdminLoginOnLeave: boolean;
   activeTestWarningThreshold: number;
   maxActiveTests: number;
   catSpeedRanges: CatSpeedRanges;

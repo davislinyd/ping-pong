@@ -3,6 +3,8 @@ import {
   ArrowDown,
   ArrowUp,
   Clock3,
+  FileText,
+  Image,
   Loader2,
   Radio,
   RotateCw,
@@ -30,6 +32,7 @@ import {
   heartbeatActiveTestSession,
   loadActiveTests,
   loadRecentResults,
+  loadReportContext,
   loadRuntimeConfig,
   saveResult,
   startActiveTestSession,
@@ -39,6 +42,7 @@ import {
 } from "./speed-test";
 import { AdminConsole } from "./AdminConsole";
 import { buildCompletionSummary, type CompletionSummary } from "./result-summary";
+import { buildReportSnapshot, downloadReport, type ReportFormat } from "./report-export";
 import { isSpeedTestWorkerAbort, startSpeedTestWorker, type RunningSpeedTestWorker } from "./speed-test-worker-client";
 
 type MetricTone = "teal" | "amber" | "blue" | "rose" | "ink" | "green";
@@ -91,6 +95,7 @@ function SpeedTestApp() {
   const [config, setConfig] = useState<RuntimeConfigResponse | null>(null);
   const [recent, setRecent] = useState<SavedResult[]>([]);
   const [result, setResult] = useState<ResultPayload>(emptyResult);
+  const [lastSavedResult, setLastSavedResult] = useState<SavedResult | null>(null);
   const [phase, setPhase] = useState<TestPhase>("idle");
   const [currentMbps, setCurrentMbps] = useState<number | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
@@ -98,10 +103,14 @@ function SpeedTestApp() {
   const [transferMegabits, setTransferMegabits] = useState<TransferMegabits>({ download: 0, upload: 0 });
   const [activeStatus, setActiveStatus] = useState<ActiveTestsResponse>(emptyActiveStatus);
   const [error, setError] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportBusyFormat, setReportBusyFormat] = useState<ReportFormat | null>(null);
   const [selectedMetricLabel, setSelectedMetricLabel] = useState<string | null>(null);
   const [isDeletingRecent, setIsDeletingRecent] = useState(false);
   const activeSessionRef = useRef<string | null>(null);
   const heartbeatTimerRef = useRef<number | null>(null);
+  const adminEntryClickCountRef = useRef(0);
+  const adminEntryResetTimerRef = useRef<number | null>(null);
   const workerRunRef = useRef<RunningSpeedTestWorker | null>(null);
   const testRunIdRef = useRef(0);
 
@@ -144,6 +153,7 @@ function SpeedTestApp() {
     return () => {
       terminateCurrentWorkerRun();
       stopHeartbeat();
+      stopAdminEntryResetTimer();
       if (activeSessionRef.current) {
         void finishActiveTestSession(activeSessionRef.current).catch(() => undefined);
       }
@@ -243,6 +253,8 @@ function SpeedTestApp() {
         durationSeconds: runtimeConfig.defaultTestDurationSeconds,
         parallelConnections: runtimeConfig.parallelConnections
       });
+      setLastSavedResult(null);
+      setReportError(null);
       setCurrentMbps(null);
       setProgressPercent(0);
       setMetricSeries(createEmptyMetricSeries());
@@ -295,6 +307,7 @@ function SpeedTestApp() {
       const saved = await saveResult(measured);
       if (testRunIdRef.current === runId) {
         setResult(measured);
+        setLastSavedResult(saved);
         setTransferMegabits(latestTransferMegabits);
         setRecent((items) => [saved, ...items.filter((item) => item.id !== saved.id)].slice(0, 50));
         setProgressPercent(100);
@@ -320,6 +333,23 @@ function SpeedTestApp() {
   const secondaryMetrics = metrics.slice(2);
   const selectedMetric = selectedMetricLabel ? (metrics.find((metric) => metric.label === selectedMetricLabel) ?? null) : null;
 
+  function handleAdminEntryClick() {
+    stopAdminEntryResetTimer();
+
+    const nextClickCount = adminEntryClickCountRef.current + 1;
+    if (nextClickCount >= 5) {
+      adminEntryClickCountRef.current = 0;
+      window.location.assign("/admin");
+      return;
+    }
+
+    adminEntryClickCountRef.current = nextClickCount;
+    adminEntryResetTimerRef.current = window.setTimeout(() => {
+      adminEntryClickCountRef.current = 0;
+      adminEntryResetTimerRef.current = null;
+    }, 1500);
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -339,117 +369,127 @@ function SpeedTestApp() {
               {activeTests}/{activeStatus.maxActiveTests} testing now
             </span>
           </div>
-          <div className="server-pill">
+          <button className="server-pill version-pill" type="button" aria-label={`App version v${__APP_VERSION__}`} onClick={handleAdminEntryClick}>
             <Server size={17} />
             <span>v{__APP_VERSION__}</span>
-          </div>
+          </button>
         </div>
       </header>
 
-      {localClientWarning ? (
-        <section className="local-warning" role="status" aria-live="polite">
-          <TriangleAlert size={20} />
-          <div>
-            <strong>Local self-test detected</strong>
-            <p>{localClientWarning} Open this page from another device to run a valid intranet speed test.</p>
-          </div>
-        </section>
-      ) : null}
+      <div className="dashboard-shell">
+        <div className="notice-stack">
+          {localClientWarning ? (
+            <section className="local-warning" role="status" aria-live="polite">
+              <TriangleAlert size={20} />
+              <div>
+                <strong>Local self-test detected</strong>
+                <p>{localClientWarning} Open this page from another device to run a valid intranet speed test.</p>
+              </div>
+            </section>
+          ) : null}
 
-      {concurrencyWarning ? (
-        <section className={`capacity-warning${concurrencyFull ? " is-full" : ""}`} role="status" aria-live="polite">
-          <UsersRound size={20} />
-          <div>
-            <strong>{concurrencyFull ? "Test capacity is full" : "Multiple active tests detected"}</strong>
-            <p>
-              {concurrencyFull
-                ? `All ${activeStatus.maxActiveTests} speed-test slots are in use. Try again after another test finishes.`
-                : `${activeTests} people are testing now. Results may affect each other until active tests finish.`}
-            </p>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="test-panel" aria-live="polite">
-        <div className="test-panel-main">
-          <div className={`speed-test-display phase-${phase}${phase === "complete" ? ` summary-${completionSummary.verdict}` : ""}`}>
-            {phase === "complete" ? (
-              <CompletionSummaryPanel summary={completionSummary} />
-            ) : (
-              <>
-                <div className="speed-readout">
-                  <span className="speed-label">{phase === "upload" ? "Upload" : "Download"}</span>
-                  <div className="speed-number">{mainDisplayValue}</div>
-                  <div className="speed-unit">Mbps</div>
-                </div>
-                <div className={`speed-process-chart tone-${mainReadoutTone}`}>
-                  <MetricSparkline values={mainReadoutSeries} variant="large" />
-                </div>
-                <div className="test-progress" role="progressbar" aria-label="Phase progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={roundedProgress}>
-                  <div className="test-progress-track">
-                    <span className="test-progress-fill" style={{ width: `${progressPercent}%` }} />
-                  </div>
-                  <span className="test-progress-value">{roundedProgress}%</span>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="stage-copy">
-            <div>
-              <span className="stage-kicker">Current status</span>
-              {error ? (
-                <p className="error-text">{error}</p>
-              ) : (
-                <p className="stage-meta">
-                  {testBlocked
-                    ? "Use another device to run a valid intranet test"
-                    : concurrencyFull
-                      ? "Wait for an active test slot to become available"
-                      : phaseText(phase, result, completionSummary)}
+          {concurrencyWarning ? (
+            <section className={`capacity-warning${concurrencyFull ? " is-full" : ""}`} role="status" aria-live="polite">
+              <UsersRound size={20} />
+              <div>
+                <strong>{concurrencyFull ? "Test capacity is full" : "Multiple active tests detected"}</strong>
+                <p>
+                  {concurrencyFull
+                    ? `All ${activeStatus.maxActiveTests} speed-test slots are in use. Try again after another test finishes.`
+                    : `${activeTests} people are testing now. Results may affect each other until active tests finish.`}
                 </p>
-              )}
-            </div>
-            <TransferSummary downloadMegabits={transferMegabits.download} uploadMegabits={transferMegabits.upload} />
-            <button className="primary-action" type="button" disabled={!config || isRunning || testBlocked || concurrencyFull} onClick={() => void startTest()}>
-              {isRunning ? <Loader2 className="spin" size={20} /> : <RotateCw size={20} />}
-              <span>{testBlocked ? "Blocked" : concurrencyFull ? "Full" : isRunning ? "Running" : buttonLabel}</span>
-            </button>
+              </div>
+            </section>
+          ) : null}
+        </div>
 
-            <div className="primary-metrics" aria-label="Speed metrics">
-              {primaryMetrics.map((metric) => (
-                <MetricCard metric={metric} variant="primary" key={metric.label} onOpen={() => setSelectedMetricLabel(metric.label)} />
+        <div className="dashboard-stack">
+          <section className="test-panel" aria-live="polite">
+            <div className="test-panel-main">
+              <div className={`speed-test-display phase-${phase}${phase === "complete" ? ` summary-${completionSummary.verdict}` : ""}`}>
+                {phase === "complete" ? (
+                  <CompletionSummaryPanel summary={completionSummary} />
+                ) : (
+                  <>
+                    <div className="speed-readout">
+                      <span className="speed-label">{phase === "upload" ? "Upload" : "Download"}</span>
+                      <div className="speed-number">{mainDisplayValue}</div>
+                      <div className="speed-unit">Mbps</div>
+                    </div>
+                    <div className={`speed-process-chart tone-${mainReadoutTone}`}>
+                      <MetricSparkline values={mainReadoutSeries} variant="large" />
+                    </div>
+                    <div className="test-progress" role="progressbar" aria-label="Phase progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={roundedProgress}>
+                      <div className="test-progress-track">
+                        <span className="test-progress-fill" style={{ width: `${progressPercent}%` }} />
+                      </div>
+                      <span className="test-progress-value">{roundedProgress}%</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="stage-copy">
+                <div>
+                  <span className="stage-kicker">Current status</span>
+                  {error ? (
+                    <p className="error-text">{error}</p>
+                  ) : (
+                    <p className="stage-meta">
+                      {testBlocked
+                        ? "Use another device to run a valid intranet test"
+                        : concurrencyFull
+                          ? "Wait for an active test slot to become available"
+                          : phaseText(phase, result, completionSummary)}
+                    </p>
+                  )}
+                </div>
+                <TransferSummary downloadMegabits={transferMegabits.download} uploadMegabits={transferMegabits.upload} />
+                <button className="primary-action" type="button" disabled={!config || isRunning || testBlocked || concurrencyFull} onClick={() => void startTest()}>
+                  {isRunning ? <Loader2 className="spin" size={20} /> : <RotateCw size={20} />}
+                  <span>{testBlocked ? "Blocked" : concurrencyFull ? "Full" : isRunning ? "Running" : buttonLabel}</span>
+                </button>
+
+                {phase === "complete" && lastSavedResult ? (
+                  <ReportActions busyFormat={reportBusyFormat} error={reportError} onDownload={(format) => void downloadCurrentReport(format)} />
+                ) : null}
+
+                <div className="primary-metrics" aria-label="Speed metrics">
+                  {primaryMetrics.map((metric) => (
+                    <MetricCard metric={metric} variant="primary" key={metric.label} onOpen={() => setSelectedMetricLabel(metric.label)} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="secondary-metrics" aria-label="Quality metrics">
+              {secondaryMetrics.map((metric) => (
+                <MetricCard metric={metric} variant="secondary" key={metric.label} onOpen={() => setSelectedMetricLabel(metric.label)} />
               ))}
             </div>
-          </div>
-        </div>
+          </section>
 
-        <div className="secondary-metrics" aria-label="Quality metrics">
-          {secondaryMetrics.map((metric) => (
-            <MetricCard metric={metric} variant="secondary" key={metric.label} onOpen={() => setSelectedMetricLabel(metric.label)} />
-          ))}
+          <section className="history-panel" aria-label="Recent results">
+            <div className="section-heading">
+              <h2>Your Recent Results</h2>
+              <div className="history-actions">
+                <span>{recent.length} records</span>
+                <button
+                  aria-label="Delete all your recent results from this browser"
+                  className="history-delete-button"
+                  disabled={recent.length === 0 || isDeletingRecent}
+                  onClick={() => void clearPersonalHistory()}
+                  title="Delete all your recent results from this browser"
+                  type="button"
+                >
+                  {isDeletingRecent ? <Loader2 className="spin" size={17} /> : <Trash2 size={17} />}
+                </button>
+              </div>
+            </div>
+            <HistoryBars results={recent} />
+          </section>
         </div>
-      </section>
-
-      <section className="history-panel" aria-label="Recent results">
-        <div className="section-heading">
-          <h2>Your Recent Results</h2>
-          <div className="history-actions">
-            <span>{recent.length} records</span>
-            <button
-              aria-label="Delete all your recent results from this browser"
-              className="history-delete-button"
-              disabled={recent.length === 0 || isDeletingRecent}
-              onClick={() => void clearPersonalHistory()}
-              title="Delete all your recent results from this browser"
-              type="button"
-            >
-              {isDeletingRecent ? <Loader2 className="spin" size={17} /> : <Trash2 size={17} />}
-            </button>
-          </div>
-        </div>
-        <HistoryBars results={recent} />
-      </section>
+      </div>
 
       {selectedMetric ? <MetricDetailModal metric={selectedMetric} onClose={() => setSelectedMetricLabel(null)} /> : null}
     </main>
@@ -477,6 +517,13 @@ function SpeedTestApp() {
     if (heartbeatTimerRef.current !== null) {
       window.clearInterval(heartbeatTimerRef.current);
       heartbeatTimerRef.current = null;
+    }
+  }
+
+  function stopAdminEntryResetTimer() {
+    if (adminEntryResetTimerRef.current !== null) {
+      window.clearTimeout(adminEntryResetTimerRef.current);
+      adminEntryResetTimerRef.current = null;
     }
   }
 
@@ -528,6 +575,43 @@ function SpeedTestApp() {
       setIsDeletingRecent(false);
     }
   }
+
+  async function downloadCurrentReport(format: ReportFormat) {
+    if (!config || !lastSavedResult || reportBusyFormat) {
+      return;
+    }
+
+    setReportBusyFormat(format);
+    setReportError(null);
+    let context = null;
+    let contextError: string | null = null;
+
+    try {
+      context = await loadReportContext();
+    } catch (loadError) {
+      contextError = loadError instanceof Error ? loadError.message : "Report context is unavailable";
+    }
+
+    try {
+      const snapshot = buildReportSnapshot({
+        savedResult: lastSavedResult,
+        config,
+        summary: completionSummary,
+        activeStatus,
+        transferMegabits,
+        metricSeries,
+        context,
+        contextError,
+        appVersion: __APP_VERSION__,
+        pageUrl: window.location.href
+      });
+      await downloadReport(snapshot, format);
+    } catch (downloadError) {
+      setReportError(downloadError instanceof Error ? downloadError.message : "Failed to create report");
+    } finally {
+      setReportBusyFormat(null);
+    }
+  }
 }
 
 function TransferSummary({ downloadMegabits, uploadMegabits }: { downloadMegabits: number; uploadMegabits: number }) {
@@ -566,6 +650,24 @@ function CompletionSummaryPanel({ summary }: { summary: CompletionSummary }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ReportActions({ busyFormat, error, onDownload }: { busyFormat: ReportFormat | null; error: string | null; onDownload: (format: ReportFormat) => void }) {
+  return (
+    <div className="report-actions" aria-label="Download IT diagnostic report">
+      <div className="report-actions-row">
+        <button className="report-action-button" type="button" disabled={busyFormat !== null} onClick={() => onDownload("html")}>
+          {busyFormat === "html" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
+          <span>HTML</span>
+        </button>
+        <button className="report-action-button" type="button" disabled={busyFormat !== null} onClick={() => onDownload("png")}>
+          {busyFormat === "png" ? <Loader2 className="spin" size={16} /> : <Image size={16} />}
+          <span>PNG</span>
+        </button>
+      </div>
+      {error ? <p className="report-error" role="status">{error}</p> : null}
     </div>
   );
 }

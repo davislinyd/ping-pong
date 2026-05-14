@@ -48,6 +48,7 @@ export function editableDefaultsFromConfig(config: RuntimeConfig): EditableRunti
     parallelConnections: config.parallelConnections,
     maxTestBytes: config.maxTestBytes,
     allowLocalSelfTest: config.allowLocalSelfTest,
+    requireAdminLoginOnLeave: false,
     activeTestWarningThreshold: config.activeTestWarningThreshold,
     maxActiveTests: config.maxActiveTests,
     catSpeedRanges: cloneCatSpeedRanges(DEFAULT_CAT_SPEED_RANGES)

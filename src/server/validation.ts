@@ -59,6 +59,7 @@ const editableRuntimeSettingsBaseSchema = z
     parallelConnections: z.number().int().min(1).max(16),
     maxTestBytes: z.number().int().min(1_048_576).max(MAX_ALLOWED_TEST_BYTES),
     allowLocalSelfTest: z.boolean(),
+    requireAdminLoginOnLeave: z.boolean(),
     activeTestWarningThreshold: z.number().int().min(1).max(100),
     maxActiveTests: z.number().int().min(1).max(100),
     catSpeedRanges: z

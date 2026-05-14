@@ -8,7 +8,7 @@ import { BROWSER_CLIENT_ID_HEADER, type EditableRuntimeSettings } from "../share
 import { AdminSessionManager } from "./admin-auth.js";
 import { MAX_ALLOWED_TEST_BYTES, type RuntimeConfig } from "./config.js";
 import { ActiveTestTracker } from "./active-tests.js";
-import { anonymousClientId, browserClientHash } from "./client-identity.js";
+import { anonymousClientId, browserClientHash, browserFamily, coarseIp } from "./client-identity.js";
 import { ResultsRepository } from "./db.js";
 import { createDownloadStream } from "./download-stream.js";
 import { detectLocalClient } from "./local-client.js";
@@ -57,6 +57,23 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
       parallelConnections: settings.parallelConnections,
       maxTestBytes: settings.maxTestBytes,
       catSpeedRanges: settings.catSpeedRanges,
+      clientSafety: clientSafetyForRequest(settings, request.ip)
+    };
+  });
+
+  app.get("/api/report-context", async (request, reply) => {
+    const settings = runtimeSettings.current();
+    reply.headers(noStoreHeaders());
+    return {
+      serverTime: new Date().toISOString(),
+      serverName: settings.testServerName,
+      requestHost: request.hostname,
+      requestProtocol: request.protocol,
+      clientIp: request.ip,
+      coarseIp: coarseIp(request.ip),
+      ipSource: config.trustProxy ? "trusted-proxy-request-ip" : "direct-request-ip",
+      trustProxyAware: config.trustProxy,
+      browserFamily: browserFamily(firstHeader(request.headers["user-agent"])),
       clientSafety: clientSafetyForRequest(settings, request.ip)
     };
   });
@@ -414,6 +431,10 @@ function adminLimit(query: unknown): number {
     return 50;
   }
   return Math.max(1, Math.min(100, Math.trunc(rawLimit)));
+}
+
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 async function registerStaticClient(app: FastifyInstance): Promise<void> {

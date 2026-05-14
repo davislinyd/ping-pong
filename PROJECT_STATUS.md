@@ -1,35 +1,38 @@
 # Ping Pong Project Status
 
-Last updated: 2026-05-14T14:01:05+08:00
+Last updated: 2026-05-14T15:43:24+08:00
 
 ## Current Goal
 
-Maintain Ping Pong as a single-node intranet speed-test service with verified browser-scoped Recent Results, user-owned result deletion, multi-stat throughput reporting, current-test accumulated transfer display, Web Worker speed-test execution, up-to-date documentation, local production health checks, and OctoPulse visibility.
+Maintain Ping Pong as a single-node intranet speed-test service with browser-scoped Recent Results, multi-stat throughput reporting, current-test transfer display, Web Worker execution, compact IT diagnostic report export, a desktop one-screen dashboard, Admin Console controls, local production health checks, and OctoPulse visibility.
 
 ## Latest Summary
 
-Ping Pong is a Node.js 24 Fastify + React app for intranet speed testing. Current implementation reports Download/Upload P10 Low, P50 Typical, P90 High, sample count, current-test accumulated transfer as `Total Download` / `Total Upload` in megabits (`Mb`), a completion `Test Summary` panel, and browser/device-scoped `Your Recent Results`. The speed-test body runs inside a module Web Worker; the main page terminates the Worker after completion, Retest, error, or unmount so test-time heap, timers, upload buffers, sampler arrays, AbortController state, and stream-reader references can be released without reloading the page. The old sessionStorage snapshot and scheduled reload flow were removed. README now documents the accumulated `Mb` display, the Worker/no-reload memory behavior, and the fact that accumulated transfer is current-test UI state only. Recent results and server API/storage formats remain unchanged. The Web Worker update passed typecheck, Vitest (6 files / 45 tests), build, production service restart, `/api/health`, `/api/active-tests`, browser flow verification, docs/status validation, and OctoPulse scanning. The folder is a git repo on `main`; the deliverable is a local initial commit because no remote is configured.
+Ping Pong is a Node.js 24 Fastify + React app for intranet speed testing. Completed tests now expose compact `HTML` and `PNG` IT diagnostic report downloads near the existing retest action without moving the main dashboard cards or Recent Results. Reports now include a `Test Charts` section with the current run's download, upload, idle latency, loaded latency, jitter, and HTTP loss graphs before the numeric diagnostic sections. Reports also combine the saved result with request context from the no-store `GET /api/report-context` endpoint and browser-side diagnostics such as User-Agent, platform, timezone, viewport, screen, CPU thread hint, device memory hint, and Network Information API hints when available. Raw client IP and full User-Agent appear only in user-downloaded report files and are not stored in SQLite by this export flow. The existing speed-test flow, active-test heartbeat, result saving, personal history deletion, Admin Console, metric detail modal, generated favicon, and layout structure are preserved.
 
 ## Next Action
 
-Configure the intended GitLab remote if this project should be pushed. If the live service should use the documented 15s default duration, update the existing `.env` or Admin Console runtime setting from 8 to 15 and restart/save as appropriate.
+Configure the intended GitLab remote before push or release workflows. If IT needs deeper machine-level data such as Wi-Fi SSID, MAC address, hostname, route table, or CPU model, plan a separate native helper or browser extension because the current browser-only page cannot collect those fields.
 
 ## Verification
 
 - `npm run typecheck` passed.
-- `npm test` passed: 6 test files and 45 tests.
+- `npm test` passed: 7 test files and 52 tests.
 - `npm run build` passed.
+- Production service on port 8080 was restarted after the build; the current listener is `node dist/server/main.js` PID 40029 under `npm start` PID 39901.
+- `curl -sS http://127.0.0.1:8080/api/health` returned healthy service metadata.
+- `curl -sS -D - http://127.0.0.1:8080/api/report-context -H 'User-Agent: Mozilla/5.0 Chrome/120.0'` returned `200 OK`, no-store headers, client IP/coarse IP, browser family, and client safety data without raw header dumps.
+- In-app browser verification loaded `http://127.0.0.1:8080/`, completed a local self-test, and confirmed `HTML` / `PNG` report buttons appear only after completion.
+- Playwright CLI downloaded both chart-bearing reports from the completed state: `/tmp/ping-pong-report-chart.html` and `/tmp/ping-pong-report-chart.png`.
+- Downloaded HTML contains `Test Charts`, six SVG chart elements, and chart polylines; downloaded PNG is a readable 1080 x 3853 PNG with the chart section included.
+- Desktop layout checks passed at `1089x964`, `1280x900`, and `1710x1021`: page height matched viewport height, top-row card widths were equal, Recent Results stayed below the test panel, and the report buttons stayed compact.
+- Tablet/mobile checks at `768x1024` and `390x844` showed reachable vertical content and no horizontal overflow for the report controls or main homepage sections.
 - `git diff --check` passed.
 - OctoPulse status JSON validation passed.
-- OctoPulse scanner refreshed central outputs for 6 projects.
-- Production service on port 8080 was restarted after the build; killing the old `npm start`/`node dist/server/main.js` pair caused a fresh supervised `npm start`/`node dist/server/main.js` pair to listen on port 8080.
-- `curl -s http://127.0.0.1:8080/api/health` returned healthy service metadata.
-- `curl -s http://127.0.0.1:8080/api/config` confirmed live runtime still allows local self-tests and uses `defaultTestDurationSeconds: 8`.
-- `curl -s http://127.0.0.1:8080/api/active-tests` confirmed no active test sessions remained after browser verification.
-- Browser check opened `http://127.0.0.1:8080/` and confirmed the accumulated transfer row starts at `0.00 Mb`, successful completion keeps the completed summary and accumulated `Mb` on the same page after a 6-second post-completion delay, Retest resets values to `0.00 Mb` and starts a new Worker run, the next completed test keeps the summary and accumulated `Mb`, browser console logs contain no Worker-related uncaught errors, and `/api/active-tests` returns to 0.
+- OctoPulse scanner refreshed central outputs.
 
 ## Attention
 
 - Git repo exists on `main` with no configured remote or upstream, so this delivery can only be committed locally until a remote is added.
-- Current live runtime still reports `defaultTestDurationSeconds: 8`; `.env.example`/README default is now 15, but existing `.env` or SQLite runtime settings must be updated separately to use 15 seconds.
-- Local self-tests still show a warning because they are not real intranet measurements, but they now remain visible in the browser/device owner's personal Recent Results.
+- Local self-tests still show a warning because they are not real intranet measurements.
+- Report export is intentionally browser-only and does not collect machine data unavailable to normal webpages, such as Wi-Fi SSID, MAC address, hostname, route table, or CPU model.

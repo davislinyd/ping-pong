@@ -15,6 +15,7 @@ const defaults: EditableRuntimeSettings = {
   parallelConnections: 4,
   maxTestBytes: 67_108_864,
   allowLocalSelfTest: false,
+  requireAdminLoginOnLeave: false,
   activeTestWarningThreshold: 2,
   maxActiveTests: 4,
   catSpeedRanges: cloneCatSpeedRanges(DEFAULT_CAT_SPEED_RANGES)
@@ -46,6 +47,7 @@ describe("RuntimeSettingsService", () => {
       maxActiveTests: 6,
       activeTestWarningThreshold: 3,
       allowLocalSelfTest: true,
+      requireAdminLoginOnLeave: true,
       catSpeedRanges: {
         idle: { minMbps: 0, maxMbps: 1 },
         walk: { minMbps: 1, maxMbps: 25 },
@@ -54,7 +56,14 @@ describe("RuntimeSettingsService", () => {
         sprint: { minMbps: 500, maxMbps: null }
       }
     });
-    expect(updated.changedKeys.sort()).toEqual(["activeTestWarningThreshold", "allowLocalSelfTest", "catSpeedRanges", "maxActiveTests", "testServerName"]);
+    expect(updated.changedKeys.sort()).toEqual([
+      "activeTestWarningThreshold",
+      "allowLocalSelfTest",
+      "catSpeedRanges",
+      "maxActiveTests",
+      "requireAdminLoginOnLeave",
+      "testServerName"
+    ]);
     repository.close();
 
     const reopenedRepository = new ResultsRepository(sqlitePath);
@@ -69,6 +78,7 @@ describe("RuntimeSettingsService", () => {
       maxActiveTests: 6,
       activeTestWarningThreshold: 3,
       allowLocalSelfTest: true,
+      requireAdminLoginOnLeave: true,
       catSpeedRanges: {
         idle: { minMbps: 0, maxMbps: 1 },
         walk: { minMbps: 1, maxMbps: 25 },

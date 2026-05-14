@@ -19,6 +19,7 @@ const settingKeys = [
   "parallelConnections",
   "maxTestBytes",
   "allowLocalSelfTest",
+  "requireAdminLoginOnLeave",
   "activeTestWarningThreshold",
   "maxActiveTests",
   "catSpeedRanges"

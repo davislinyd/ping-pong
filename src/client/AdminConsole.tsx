@@ -103,6 +103,40 @@ export function AdminConsole() {
       .catch((loadError) => setError(messageFromError(loadError)));
   }, []);
 
+  useEffect(() => {
+    if (!session?.authenticated || !settingsResponse?.settings.requireAdminLoginOnLeave) return;
+
+    let logoutSent = false;
+    function logoutOnLeave() {
+      if (logoutSent) return;
+      logoutSent = true;
+      sendLeaveLogout();
+    }
+
+    window.addEventListener("pagehide", logoutOnLeave);
+    return () => window.removeEventListener("pagehide", logoutOnLeave);
+  }, [session?.authenticated, settingsResponse?.settings.requireAdminLoginOnLeave]);
+
+  useEffect(() => {
+    if (!session?.authenticated) return;
+
+    function verifyRestoredSession(event: PageTransitionEvent) {
+      if (!event.persisted) return;
+
+      void loadAdminSession()
+        .then((nextSession) => {
+          setSession(nextSession);
+          if (!nextSession.authenticated) {
+            clearAdminData();
+          }
+        })
+        .catch((loadError) => setError(messageFromError(loadError)));
+    }
+
+    window.addEventListener("pageshow", verifyRestoredSession);
+    return () => window.removeEventListener("pageshow", verifyRestoredSession);
+  }, [session?.authenticated]);
+
   async function refreshAdminData() {
     setBusy("refresh");
     setError(null);
@@ -149,10 +183,7 @@ export function AdminConsole() {
     try {
       const nextSession = await logoutAdmin();
       setSession(nextSession);
-      setSettingsResponse(null);
-      setStatusResponse(null);
-      setDraft(null);
-      setEvents([]);
+      clearAdminData();
       setNotice(null);
     } catch (logoutError) {
       setError(messageFromError(logoutError));
@@ -198,6 +229,13 @@ export function AdminConsole() {
 
   function updateDraft<K extends keyof EditableRuntimeSettings>(key: K, value: EditableRuntimeSettings[K]) {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
+  }
+
+  function clearAdminData() {
+    setSettingsResponse(null);
+    setStatusResponse(null);
+    setDraft(null);
+    setEvents([]);
   }
 
   function updateCatSpeedRange(stage: CatSpeedStage, key: keyof CatSpeedRange, value: number | null) {
@@ -341,6 +379,15 @@ export function AdminConsole() {
                 <span>Allow local self-test</span>
               </label>
 
+              <label className="admin-toggle">
+                <input
+                  checked={draft.requireAdminLoginOnLeave}
+                  type="checkbox"
+                  onChange={(event) => updateDraft("requireAdminLoginOnLeave", event.target.checked)}
+                />
+                <span>Require password after leaving admin console</span>
+              </label>
+
               {thresholdInvalid ? <p className="admin-error">Warning threshold must be less than or equal to max active tests.</p> : null}
               {rangeValidationMessage ? <p className="admin-error">{rangeValidationMessage}</p> : null}
 
@@ -473,6 +520,19 @@ function AdminHeader({ authenticated, onLogout }: { authenticated: boolean; onLo
       </div>
     </header>
   );
+}
+
+function sendLeaveLogout() {
+  if (navigator.sendBeacon && navigator.sendBeacon("/api/admin/logout")) {
+    return;
+  }
+
+  void fetch("/api/admin/logout", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    keepalive: true
+  }).catch(() => undefined);
 }
 
 function CatSpeedRangeEditor({

@@ -57,6 +57,75 @@ describe("speed test API", () => {
     });
   });
 
+  it("returns no-store report context without exposing raw request headers", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/report-context",
+      headers: {
+        cookie: "session=secret",
+        authorization: "Bearer secret",
+        "user-agent": "Mozilla/5.0 Chrome/120.0"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toContain("no-store");
+    expect(response.json()).toMatchObject({
+      serverName: "Test Node",
+      clientIp: "127.0.0.1",
+      coarseIp: "ipv4:127.0.0.0",
+      ipSource: "direct-request-ip",
+      trustProxyAware: false,
+      browserFamily: "Chrome",
+      clientSafety: {
+        isLocalClient: true,
+        canRunTest: true
+      }
+    });
+    expect(response.json()).not.toHaveProperty("headers");
+    expect(response.json()).not.toHaveProperty("cookie");
+    expect(response.json()).not.toHaveProperty("authorization");
+  });
+
+  it("marks report context IP source as trusted proxy aware when configured", async () => {
+    const proxyApp = await createApp(
+      loadConfig({
+        PORT: "8080",
+        HOST: "127.0.0.1",
+        TEST_SERVER_NAME: "Proxy Test Node",
+        SQLITE_PATH: ":memory:",
+        HISTORY_RETENTION_DAYS: "30",
+        DEFAULT_TEST_DURATION_SECONDS: "3",
+        PARALLEL_CONNECTIONS: "2",
+        MAX_TEST_BYTES: "1048576",
+        TRUST_PROXY: "true",
+        ALLOW_LOCAL_SELF_TEST: "true"
+      })
+    );
+
+    try {
+      const response = await proxyApp.inject({
+        method: "GET",
+        url: "/api/report-context",
+        headers: {
+          "x-forwarded-for": "10.20.30.40",
+          "user-agent": "Mozilla/5.0 Firefox/120.0"
+        }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        clientIp: "10.20.30.40",
+        coarseIp: "ipv4:10.20.30.0",
+        ipSource: "trusted-proxy-request-ip",
+        trustProxyAware: true,
+        browserFamily: "Firefox"
+      });
+    } finally {
+      await proxyApp.close();
+    }
+  });
+
   it("blocks local speed test endpoints by default", async () => {
     const blockedApp = await createApp(
       loadConfig({
@@ -209,6 +278,7 @@ describe("speed test API", () => {
     expect(settings.json()).toMatchObject({
       settings: {
         testServerName: "Test Node",
+        requireAdminLoginOnLeave: false,
         maxActiveTests: 4
       },
       startup: {
@@ -239,6 +309,7 @@ describe("speed test API", () => {
         defaultTestDurationSeconds: 5,
         parallelConnections: 3,
         maxTestBytes: 2_097_152,
+        requireAdminLoginOnLeave: true,
         activeTestWarningThreshold: 1,
         maxActiveTests: 2,
         catSpeedRanges: {
@@ -258,6 +329,7 @@ describe("speed test API", () => {
         defaultTestDurationSeconds: 5,
         parallelConnections: 3,
         maxTestBytes: 2_097_152,
+        requireAdminLoginOnLeave: true,
         activeTestWarningThreshold: 1,
         maxActiveTests: 2,
         catSpeedRanges: {

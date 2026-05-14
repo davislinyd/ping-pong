@@ -1,4 +1,12 @@
-import { BROWSER_CLIENT_ID_HEADER, type ActiveTestSessionResponse, type ActiveTestsResponse, type ResultPayload, type RuntimeConfigResponse, type SavedResult } from "../shared/contracts";
+import {
+  BROWSER_CLIENT_ID_HEADER,
+  type ActiveTestSessionResponse,
+  type ActiveTestsResponse,
+  type ReportContextResponse,
+  type ResultPayload,
+  type RuntimeConfigResponse,
+  type SavedResult
+} from "../shared/contracts";
 
 export { createEmptyMetricSeries } from "./speed-test-core";
 export type { MetricSeries, TestPhase, TestProgress } from "./speed-test-core";
@@ -20,6 +28,10 @@ export async function loadRecentResults(limit = 50): Promise<SavedResult[]> {
 
 export async function loadActiveTests(): Promise<ActiveTestsResponse> {
   return fetchJson<ActiveTestsResponse>("/api/active-tests");
+}
+
+export async function loadReportContext(): Promise<ReportContextResponse> {
+  return fetchJson<ReportContextResponse>("/api/report-context");
 }
 
 export async function startActiveTestSession(): Promise<ActiveTestSessionResponse> {
