@@ -1,5 +1,6 @@
 import type { ResultPayload, RuntimeConfigResponse, ThroughputStats } from "../shared/contracts";
 import { bytesToMegabits, bytesToMbps, jitter, lossPercent, median, roundTo, throughputStatsFromSamples, type ThroughputSample } from "../shared/metrics";
+import { API_BASE } from "./api-base";
 
 export type TestPhase = "idle" | "latency" | "download" | "upload" | "saving" | "complete" | "error";
 
@@ -30,7 +31,7 @@ type LatencySet = {
 };
 
 const DOWNLOAD_CHUNK_BYTES = 16_777_216;
-const UPLOAD_CHUNK_BYTES = 1_048_576;
+const UPLOAD_CHUNK_BYTES = 262_144;
 const LATENCY_INTERVAL_MS = 300;
 const THROUGHPUT_SAMPLE_INTERVAL_MS = 250;
 const WARMUP_MS = 1000;
@@ -219,7 +220,7 @@ async function collectLoadedLatency(stopAt: number, signal: AbortSignal, onSampl
 async function latencyOnce(signal: AbortSignal): Promise<number | null> {
   const startedAt = performance.now();
   try {
-    const response = await fetch(`/api/latency?nonce=${nonce()}`, {
+    const response = await fetch(`${API_BASE}/api/latency?nonce=${nonce()}`, {
       cache: "no-store",
       signal
     });
@@ -254,7 +255,7 @@ async function measureDownload(
 
   const workers = Array.from({ length: config.parallelConnections }, async () => {
     while (performance.now() < stopAt && !signal.aborted) {
-      const response = await fetch(`/api/download?bytes=${chunkBytes}&nonce=${nonce()}`, {
+      const response = await fetch(`${API_BASE}/api/download?bytes=${chunkBytes}&nonce=${nonce()}`, {
         cache: "no-store",
         signal
       });
@@ -327,7 +328,7 @@ async function measureUpload(
       const request = linkedSignal(signal, Math.max(1000, stopAt - performance.now() + 750));
       const requestStartedAt = performance.now();
       try {
-        const response = await fetch(`/api/upload?nonce=${nonce()}`, {
+        const response = await fetch(`${API_BASE}/api/upload?nonce=${nonce()}`, {
           method: "POST",
           headers: {
             "content-type": "application/octet-stream"

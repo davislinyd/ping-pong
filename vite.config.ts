@@ -11,14 +11,12 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(packageJson.version)
   },
   root: "src/client",
+  envDir: "../../",
   build: {
     outDir: "../../dist/client",
     emptyOutDir: true
   },
   server: {
-    port: 5173,
-    proxy: {
-      "/api": "http://127.0.0.1:8080"
-    }
+    port: 5173
   }
 });

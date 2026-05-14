@@ -1,3 +1,4 @@
+import { API_BASE } from "./api-base";
 import {
   BROWSER_CLIENT_ID_HEADER,
   type ActiveTestSessionResponse,
@@ -35,7 +36,7 @@ export async function loadReportContext(): Promise<ReportContextResponse> {
 }
 
 export async function startActiveTestSession(): Promise<ActiveTestSessionResponse> {
-  const response = await fetch("/api/active-tests", {
+  const response = await fetch(`${API_BASE}/api/active-tests`, {
     method: "POST",
     cache: "no-store"
   });
@@ -52,7 +53,7 @@ export async function startActiveTestSession(): Promise<ActiveTestSessionRespons
 }
 
 export async function heartbeatActiveTestSession(sessionId: string): Promise<ActiveTestsResponse> {
-  const response = await fetch(`/api/active-tests/${encodeURIComponent(sessionId)}/heartbeat`, {
+  const response = await fetch(`${API_BASE}/api/active-tests/${encodeURIComponent(sessionId)}/heartbeat`, {
     method: "POST",
     cache: "no-store"
   });
@@ -64,7 +65,7 @@ export async function heartbeatActiveTestSession(sessionId: string): Promise<Act
 }
 
 export async function finishActiveTestSession(sessionId: string): Promise<ActiveTestsResponse> {
-  const response = await fetch(`/api/active-tests/${encodeURIComponent(sessionId)}`, {
+  const response = await fetch(`${API_BASE}/api/active-tests/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
     cache: "no-store"
   });
@@ -76,7 +77,7 @@ export async function finishActiveTestSession(sessionId: string): Promise<Active
 }
 
 export async function saveResult(payload: ResultPayload): Promise<SavedResult> {
-  const response = await fetch("/api/results", {
+  const response = await fetch(`${API_BASE}/api/results`, {
     method: "POST",
     headers: {
       ...browserClientHeaders(),
@@ -93,7 +94,7 @@ export async function saveResult(payload: ResultPayload): Promise<SavedResult> {
 }
 
 export async function deleteRecentResults(): Promise<{ ok: true; changed: number }> {
-  const response = await fetch("/api/results", {
+  const response = await fetch(`${API_BASE}/api/results`, {
     method: "DELETE",
     headers: browserClientHeaders(),
     cache: "no-store"
@@ -107,7 +108,7 @@ export async function deleteRecentResults(): Promise<{ ok: true; changed: number
 }
 
 async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, { ...init, cache: "no-store" });
+  const response = await fetch(`${API_BASE}${url}`, { ...init, cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }

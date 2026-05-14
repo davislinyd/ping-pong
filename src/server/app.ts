@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import fs from "node:fs";
@@ -42,6 +43,10 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
       done(null, body);
     }
   );
+
+  if (process.env.NODE_ENV === "development") {
+    await app.register(cors, { origin: true, credentials: true });
+  }
 
   app.get("/api/health", async () => ({
     ok: true,

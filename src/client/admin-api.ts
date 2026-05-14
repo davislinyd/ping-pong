@@ -1,3 +1,4 @@
+import { API_BASE } from "./api-base";
 import type {
   AdminEvent,
   AdminMaintenanceResponse,
@@ -60,10 +61,10 @@ export async function resetActiveTests(): Promise<AdminMaintenanceResponse> {
 }
 
 async function adminFetch<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, {
+  const response = await fetch(`${API_BASE}${url}`, {
     ...init,
     cache: "no-store",
-    credentials: "same-origin"
+    credentials: "include"
   });
 
   if (!response.ok) {
