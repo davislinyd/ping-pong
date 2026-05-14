@@ -1,0 +1,42 @@
+{
+  "name": "Ping Pong",
+  "path": "/Users/lindav/git/Ping Pong",
+  "last_updated": "2026-05-14T14:01:05+08:00",
+  "phase": "maintenance",
+  "health": "stable",
+  "status_confidence": "high",
+  "status_source": "agent_reported",
+  "current_goal": "Maintain the single-node intranet speed-test service with verified browser-scoped Recent Results, user-owned result deletion, multi-stat throughput reporting, current-test accumulated transfer display, Web Worker speed-test execution, current documentation, local production health, and OctoPulse visibility.",
+  "latest_summary": "Fastify + React intranet speed-test app now runs the speed-test body in a module Web Worker and terminates that Worker after completion, Retest, error, or unmount so test-time heap, timers, upload buffers, sampler arrays, AbortController state, and stream-reader references can be released without reloading the page. The old sessionStorage snapshot and scheduled reload flow were removed. README now documents the accumulated Total Download / Total Upload Mb row, the Worker/no-reload memory behavior, and that accumulated transfer is current-test UI state only. Completion summary, Download/Upload Mbps, accumulated Mb, and browser-scoped Recent Results stay on the current page. The update passed typecheck, Vitest (6 files / 45 tests), build, production service restart, /api/health, /api/active-tests, browser flow verification, docs/status validation, and OctoPulse scanning. The project is on main with no configured remote; this delivery is a local git commit only.",
+  "next_action": "Configure the intended GitLab remote before push/release workflows; update .env or Admin Console runtime settings if the live service should use the documented 15s default duration.",
+  "git": {
+    "branch": "main",
+    "dirty": false,
+    "remote_tracking": null,
+    "commit": ""
+  },
+  "verification": {
+    "status": "passed",
+    "last_commands": [
+      "git status --short --branch",
+      "npm run typecheck",
+      "npm test",
+      "npm run build",
+      "kill 41016 41145",
+      "curl -sS http://127.0.0.1:8080/api/health",
+      "curl -sS http://127.0.0.1:8080/api/config",
+      "Browser smoke: completed test stays on the same page after a 6s delay, accumulated Mb remains visible, Retest resets values to 0.00 Mb and starts a new Worker run, the next completion remains visible, and Worker-related console errors are absent",
+      "curl -sS http://127.0.0.1:8080/api/active-tests",
+      "git diff --check",
+      "python /Users/lindav/git/OctoPulse/tools/validate_status.py /Users/lindav/git/Ping\\ Pong/.ai/status.json",
+      "python tools/scan_projects.py"
+    ],
+    "last_verified_at": "2026-05-14T14:01:05+08:00",
+    "notes": "Post-test browser memory release is implemented by isolating speed-test execution in a module Web Worker and terminating the Worker after completion, Retest, error, or unmount. The page no longer reloads or uses sessionStorage snapshots. README documents accumulated Mb and Worker/no-reload behavior. Browser smoke on port 8080 observed completion summary and accumulated Mb still visible after a 6s delay, Retest resetting values to 0.00 Mb and starting a new run, the next completion staying on-page, no Worker-related console errors, /api/health healthy, and activeTests returning to 0. Live config on port 8080 still reports defaultTestDurationSeconds: 8 because existing runtime settings override the documented 15s default."
+  },
+  "attention": [
+    "Git repo exists on main with no configured remote or upstream, so this delivery is local-only until a remote is added.",
+    "Live runtime still reports defaultTestDurationSeconds: 8; update .env or Admin Console runtime settings if the service should use the new 15s default.",
+    "Local self-tests still show a warning because they are not real intranet measurements, but they now remain visible in the browser/device owner's personal Recent Results."
+  ]
+}
