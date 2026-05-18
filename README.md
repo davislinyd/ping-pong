@@ -22,10 +22,20 @@ npm install
 npm run dev
 ```
 
+In development mode the Vite frontend and the Fastify API run on separate ports. The browser calls the API directly, so you must tell Vite where the API is. Create `.env.development` next to `.env` and set `VITE_API_BASE` to the API server address:
+
+```text
+VITE_API_BASE=http://<host>:<PORT>
+```
+
+Replace `<host>` with the machine's intranet IP or hostname and `<PORT>` with the value you set in `.env` (default `8080`). The frontend reads this at build time via Vite's `VITE_*` variable injection. Leave the file out or set `VITE_API_BASE=` to use relative URLs, which only works when the browser is on the same machine as the dev server.
+
+The API server enables CORS automatically when `NODE_ENV=development` so the browser can reach it across ports without a proxy.
+
 Development URLs:
 
-- Frontend: `http://localhost:5173`
-- API: `http://localhost:8080`
+- Frontend: `http://<host>:5173`
+- API: `http://<host>:<PORT>` (default `8080`)
 
 Production-style local run:
 
@@ -86,7 +96,7 @@ ADMIN_SESSION_TTL_HOURS=8
 
 `MAX_TEST_BYTES` limits a single download or upload request. The browser loops requests for the configured test duration instead of asking for one giant body.
 
-Download and upload are sampled in 250 ms throughput windows after a short warmup. The primary speed value is P50 Typical, with P10 Low and P90 High shown as supporting statistics so short spikes or dips do not dominate the result.
+Download and upload are sampled in 250 ms throughput windows after a short warmup. The primary speed value is P50 Typical, with P10 Low and P90 High shown as supporting statistics so short spikes or dips do not dominate the result. Download requests are 16 MB per chunk, streamed and sampled continuously. Upload requests are 256 KB per chunk so that more round-trip completions fit inside the test window and the upload sample count stays comparable to download.
 
 The accumulated `Total Download` and `Total Upload` row uses the same warmup-adjusted effective transfer bytes as the throughput calculation, converted to decimal megabits. It is a current-test UI value only; it is not saved in Recent Results and does not change the server result schema.
 

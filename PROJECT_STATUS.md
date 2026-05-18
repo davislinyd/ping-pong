@@ -1,6 +1,6 @@
 # Ping Pong Project Status
 
-Last updated: 2026-05-14T15:43:24+08:00
+Last updated: 2026-05-15T00:00:00+08:00
 
 ## Current Goal
 
@@ -10,9 +10,11 @@ Maintain Ping Pong as a single-node intranet speed-test service with browser-sco
 
 Ping Pong is a Node.js 24 Fastify + React app for intranet speed testing. Completed tests now expose compact `HTML` and `PNG` IT diagnostic report downloads near the existing retest action without moving the main dashboard cards or Recent Results. Reports now include a `Test Charts` section with the current run's download, upload, idle latency, loaded latency, jitter, and HTTP loss graphs before the numeric diagnostic sections. Reports also combine the saved result with request context from the no-store `GET /api/report-context` endpoint and browser-side diagnostics such as User-Agent, platform, timezone, viewport, screen, CPU thread hint, device memory hint, and Network Information API hints when available. Raw client IP and full User-Agent appear only in user-downloaded report files and are not stored in SQLite by this export flow. The existing speed-test flow, active-test heartbeat, result saving, personal history deletion, Admin Console, metric detail modal, generated favicon, and layout structure are preserved.
 
+The dev setup was rearchitected to remove the Vite proxy. The browser now calls the Fastify API directly on its own port. `@fastify/cors` is registered in development mode so cross-port requests succeed without a proxy. Frontend fetch calls use a `VITE_API_BASE` env var (set via `.env.development`) so the build-time URL is explicit and production relative URLs are unaffected. The upload chunk size was reduced from 1 MB to 256 KB to increase upload sample density and bring upload sample counts closer to download.
+
 ## Next Action
 
-Configure the intended GitLab remote before push or release workflows. If IT needs deeper machine-level data such as Wi-Fi SSID, MAC address, hostname, route table, or CPU model, plan a separate native helper or browser extension because the current browser-only page cannot collect those fields.
+If IT needs deeper machine-level data such as Wi-Fi SSID, MAC address, hostname, route table, or CPU model, plan a separate native helper or browser extension because the current browser-only page cannot collect those fields.
 
 ## Verification
 
@@ -33,6 +35,6 @@ Configure the intended GitLab remote before push or release workflows. If IT nee
 
 ## Attention
 
-- Git repo exists on `main` with no configured remote or upstream, so this delivery can only be committed locally until a remote is added.
 - Local self-tests still show a warning because they are not real intranet measurements.
+- Dev mode requires `.env.development` with `VITE_API_BASE=http://<host>:<PORT>` so the browser can reach the API server directly. Without this the frontend sends requests to the Vite dev server, which returns `index.html` for unknown routes.
 - Report export is intentionally browser-only and does not collect machine data unavailable to normal webpages, such as Wi-Fi SSID, MAC address, hostname, route table, or CPU model.
