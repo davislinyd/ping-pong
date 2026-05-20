@@ -24,7 +24,7 @@ describe("completion result summary", () => {
   it("treats wide P10 to P90 spread as a stability bottleneck", () => {
     const summary = buildCompletionSummary(
       baseResult({
-        downloadStats: stats(100, 600, 1300, 12),
+        downloadStats: stats(100, 600, 1300, 12, 120),
         uploadStats: stats(820, 900, 960, 12)
       }),
       DEFAULT_CAT_SPEED_RANGES
@@ -84,8 +84,17 @@ function baseResult(patch: Partial<ResultPayload> = {}): ResultPayload {
   };
 }
 
-function stats(p10Mbps: number, p50Mbps: number, p90Mbps: number, sampleCount: number): ThroughputStats {
-  return { p10Mbps, p50Mbps, p90Mbps, sampleCount };
+function stats(p10Mbps: number, p50Mbps: number, p90Mbps: number, sampleCount: number, cvPercent = 5): ThroughputStats {
+  return {
+    meanMbps: p50Mbps,
+    p10Mbps,
+    p50Mbps,
+    p75Mbps: (p50Mbps + p90Mbps) / 2,
+    p90Mbps,
+    cvPercent,
+    sampleCount,
+    filteredSampleCount: sampleCount
+  };
 }
 
 function tile(summary: ReturnType<typeof buildCompletionSummary>, label: string) {

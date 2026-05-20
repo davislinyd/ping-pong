@@ -47,13 +47,19 @@ export class ResultsRepository {
         server_name,
         download_mbps,
         upload_mbps,
+        download_mean_mbps,
         download_p10_mbps,
         download_p50_mbps,
+        download_p75_mbps,
         download_p90_mbps,
+        download_cv_percent,
         download_sample_count,
+        upload_mean_mbps,
         upload_p10_mbps,
         upload_p50_mbps,
+        upload_p75_mbps,
         upload_p90_mbps,
+        upload_cv_percent,
         upload_sample_count,
         idle_latency_ms,
         download_loaded_latency_ms,
@@ -67,7 +73,7 @@ export class ResultsRepository {
         browser_client_hash,
         is_local_client
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = statement.run(
@@ -75,13 +81,19 @@ export class ResultsRepository {
       context.serverName,
       payload.downloadMbps,
       payload.uploadMbps,
+      payload.downloadStats.meanMbps,
       payload.downloadStats.p10Mbps,
       payload.downloadStats.p50Mbps,
+      payload.downloadStats.p75Mbps,
       payload.downloadStats.p90Mbps,
+      payload.downloadStats.cvPercent,
       payload.downloadStats.sampleCount,
+      payload.uploadStats.meanMbps,
       payload.uploadStats.p10Mbps,
       payload.uploadStats.p50Mbps,
+      payload.uploadStats.p75Mbps,
       payload.uploadStats.p90Mbps,
+      payload.uploadStats.cvPercent,
       payload.uploadStats.sampleCount,
       payload.idleLatencyMs,
       payload.downloadLoadedLatencyMs,
@@ -121,13 +133,19 @@ export class ResultsRepository {
           server_name AS serverName,
           download_mbps AS downloadMbps,
           upload_mbps AS uploadMbps,
+          download_mean_mbps AS downloadMeanMbps,
           download_p10_mbps AS downloadP10Mbps,
           download_p50_mbps AS downloadP50Mbps,
+          download_p75_mbps AS downloadP75Mbps,
           download_p90_mbps AS downloadP90Mbps,
+          download_cv_percent AS downloadCvPercent,
           download_sample_count AS downloadSampleCount,
+          upload_mean_mbps AS uploadMeanMbps,
           upload_p10_mbps AS uploadP10Mbps,
           upload_p50_mbps AS uploadP50Mbps,
+          upload_p75_mbps AS uploadP75Mbps,
           upload_p90_mbps AS uploadP90Mbps,
+          upload_cv_percent AS uploadCvPercent,
           upload_sample_count AS uploadSampleCount,
           idle_latency_ms AS idleLatencyMs,
           download_loaded_latency_ms AS downloadLoadedLatencyMs,
@@ -282,13 +300,19 @@ export class ResultsRepository {
         server_name TEXT NOT NULL,
         download_mbps REAL NOT NULL,
         upload_mbps REAL NOT NULL,
+        download_mean_mbps REAL NOT NULL DEFAULT 0,
         download_p10_mbps REAL NOT NULL,
         download_p50_mbps REAL NOT NULL,
+        download_p75_mbps REAL NOT NULL DEFAULT 0,
         download_p90_mbps REAL NOT NULL,
+        download_cv_percent REAL NOT NULL DEFAULT 0,
         download_sample_count INTEGER NOT NULL,
+        upload_mean_mbps REAL NOT NULL DEFAULT 0,
         upload_p10_mbps REAL NOT NULL,
         upload_p50_mbps REAL NOT NULL,
+        upload_p75_mbps REAL NOT NULL DEFAULT 0,
         upload_p90_mbps REAL NOT NULL,
+        upload_cv_percent REAL NOT NULL DEFAULT 0,
         upload_sample_count INTEGER NOT NULL,
         idle_latency_ms REAL NOT NULL,
         download_loaded_latency_ms REAL NOT NULL,
@@ -354,6 +378,25 @@ export class ResultsRepository {
         WHERE download_sample_count = 0 AND upload_sample_count = 0
       `);
     }
+
+    const addedMean = this.addResultColumn(columns, "download_mean_mbps", "download_mean_mbps REAL NOT NULL DEFAULT 0");
+    const addedP75 = this.addResultColumn(columns, "download_p75_mbps", "download_p75_mbps REAL NOT NULL DEFAULT 0");
+    const addedCv = this.addResultColumn(columns, "download_cv_percent", "download_cv_percent REAL NOT NULL DEFAULT 0");
+    const addedUpMean = this.addResultColumn(columns, "upload_mean_mbps", "upload_mean_mbps REAL NOT NULL DEFAULT 0");
+    const addedUpP75 = this.addResultColumn(columns, "upload_p75_mbps", "upload_p75_mbps REAL NOT NULL DEFAULT 0");
+    const addedUpCv = this.addResultColumn(columns, "upload_cv_percent", "upload_cv_percent REAL NOT NULL DEFAULT 0");
+
+    if (addedMean || addedP75 || addedCv || addedUpMean || addedUpP75 || addedUpCv) {
+      this.db.exec(`
+        UPDATE results
+        SET
+          download_mean_mbps = download_mbps,
+          download_p75_mbps = download_p90_mbps,
+          upload_mean_mbps = upload_mbps,
+          upload_p75_mbps = upload_p90_mbps
+        WHERE download_mean_mbps = 0 AND upload_mean_mbps = 0
+      `);
+    }
   }
 
   private addResultColumn(columns: Array<{ name: string }>, name: string, definition: string): boolean {
@@ -369,13 +412,19 @@ export class ResultsRepository {
 
 type ResultRow = Omit<SavedResult, "isLocalClient" | "downloadStats" | "uploadStats"> & {
   isLocalClient: number;
+  downloadMeanMbps: number;
   downloadP10Mbps: number;
   downloadP50Mbps: number;
+  downloadP75Mbps: number;
   downloadP90Mbps: number;
+  downloadCvPercent: number;
   downloadSampleCount: number;
+  uploadMeanMbps: number;
   uploadP10Mbps: number;
   uploadP50Mbps: number;
+  uploadP75Mbps: number;
   uploadP90Mbps: number;
+  uploadCvPercent: number;
   uploadSampleCount: number;
 };
 
@@ -391,16 +440,24 @@ function rowToSavedResult(row: unknown): SavedResult {
     downloadMbps: result.downloadMbps,
     uploadMbps: result.uploadMbps,
     downloadStats: {
+      meanMbps: result.downloadMeanMbps,
       p10Mbps: result.downloadP10Mbps,
       p50Mbps: result.downloadP50Mbps,
+      p75Mbps: result.downloadP75Mbps,
       p90Mbps: result.downloadP90Mbps,
-      sampleCount: result.downloadSampleCount
+      cvPercent: result.downloadCvPercent,
+      sampleCount: result.downloadSampleCount,
+      filteredSampleCount: result.downloadSampleCount
     },
     uploadStats: {
+      meanMbps: result.uploadMeanMbps,
       p10Mbps: result.uploadP10Mbps,
       p50Mbps: result.uploadP50Mbps,
+      p75Mbps: result.uploadP75Mbps,
       p90Mbps: result.uploadP90Mbps,
-      sampleCount: result.uploadSampleCount
+      cvPercent: result.uploadCvPercent,
+      sampleCount: result.uploadSampleCount,
+      filteredSampleCount: result.uploadSampleCount
     },
     idleLatencyMs: result.idleLatencyMs,
     downloadLoadedLatencyMs: result.downloadLoadedLatencyMs,

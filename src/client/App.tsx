@@ -19,31 +19,25 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  type ActiveTestsResponse,
   type ResultPayload,
   type RuntimeConfigResponse,
   type SavedResult,
   type ThroughputStats
 } from "../shared/contracts";
 import {
-  createEmptyMetricSeries,
   deleteRecentResults,
-  finishActiveTestSession,
-  heartbeatActiveTestSession,
-  loadActiveTests,
   loadRecentResults,
   loadReportContext,
   loadRuntimeConfig,
   saveResult,
-  startActiveTestSession,
-  type MetricSeries,
-  type TestPhase,
-  type TestProgress
+  type TestPhase
 } from "./speed-test";
 import { AdminConsole } from "./AdminConsole";
 import { buildCompletionSummary, type CompletionSummary } from "./result-summary";
 import { buildReportSnapshot, downloadReport, type ReportFormat } from "./report-export";
-import { isSpeedTestWorkerAbort, startSpeedTestWorker, type RunningSpeedTestWorker } from "./speed-test-worker-client";
+import { isSpeedTestWorkerAbort } from "./speed-test-worker-client";
+import { useActiveSession } from "./hooks/useActiveSession";
+import { useSpeedTest } from "./hooks/useSpeedTest";
 
 type MetricTone = "teal" | "amber" | "blue" | "rose" | "ink" | "green";
 
@@ -57,35 +51,7 @@ type Metric = {
   stats?: ThroughputStats;
 };
 
-type TransferMegabits = {
-  download: number;
-  upload: number;
-};
-
 declare const __APP_VERSION__: string;
-
-const emptyResult: ResultPayload = {
-  downloadMbps: 0,
-  uploadMbps: 0,
-  downloadStats: emptyThroughputStats(),
-  uploadStats: emptyThroughputStats(),
-  idleLatencyMs: 0,
-  downloadLoadedLatencyMs: 0,
-  uploadLoadedLatencyMs: 0,
-  jitterMs: 0,
-  httpLossPercent: 0,
-  durationSeconds: 0,
-  parallelConnections: 0
-};
-
-const emptyActiveStatus: ActiveTestsResponse = {
-  activeTests: 0,
-  warningThreshold: 2,
-  maxActiveTests: 4,
-  isWarning: false,
-  isFull: false,
-  updatedAt: ""
-};
 
 export function App() {
   return window.location.pathname === "/admin" ? <AdminConsole /> : <SpeedTestApp />;
@@ -94,27 +60,20 @@ export function App() {
 function SpeedTestApp() {
   const [config, setConfig] = useState<RuntimeConfigResponse | null>(null);
   const [recent, setRecent] = useState<SavedResult[]>([]);
-  const [result, setResult] = useState<ResultPayload>(emptyResult);
   const [lastSavedResult, setLastSavedResult] = useState<SavedResult | null>(null);
-  const [phase, setPhase] = useState<TestPhase>("idle");
-  const [currentMbps, setCurrentMbps] = useState<number | null>(null);
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [metricSeries, setMetricSeries] = useState<MetricSeries>(() => createEmptyMetricSeries());
-  const [transferMegabits, setTransferMegabits] = useState<TransferMegabits>({ download: 0, upload: 0 });
-  const [activeStatus, setActiveStatus] = useState<ActiveTestsResponse>(emptyActiveStatus);
-  const [error, setError] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportBusyFormat, setReportBusyFormat] = useState<ReportFormat | null>(null);
   const [selectedMetricLabel, setSelectedMetricLabel] = useState<string | null>(null);
   const [isDeletingRecent, setIsDeletingRecent] = useState(false);
-  const activeSessionRef = useRef<string | null>(null);
-  const heartbeatTimerRef = useRef<number | null>(null);
   const adminEntryClickCountRef = useRef(0);
   const adminEntryResetTimerRef = useRef<number | null>(null);
-  const workerRunRef = useRef<RunningSpeedTestWorker | null>(null);
-  const testRunIdRef = useRef(0);
 
-  const isRunning = ["latency", "download", "upload", "saving"].includes(phase);
+  const speedTest = useSpeedTest();
+  const session = useActiveSession();
+
+  const { phase, result, currentMbps, progressPercent, metricSeries, transferMegabits, error, isRunning } = speedTest;
+  const { activeStatus } = session;
+
   const isSpeedPhase = phase === "download" || phase === "upload";
   const mainDisplayValue = isSpeedPhase && currentMbps === null ? "--" : formatNumber(isSpeedPhase && currentMbps !== null ? currentMbps : result.downloadMbps);
   const roundedProgress = Math.round(progressPercent);
@@ -128,36 +87,15 @@ function SpeedTestApp() {
   const completionSummary = useMemo(() => buildCompletionSummary(result, config?.catSpeedRanges), [config?.catSpeedRanges, result]);
 
   useEffect(() => {
-    void Promise.all([loadRuntimeConfig(), loadRecentResults(), loadActiveTests()])
-      .then(([runtimeConfig, recentResults, activeTestsResult]) => {
+    void Promise.all([loadRuntimeConfig(), loadRecentResults()])
+      .then(([runtimeConfig, recentResults]) => {
         setConfig(runtimeConfig);
         setRecent(recentResults);
-        setActiveStatus(activeTestsResult);
       })
       .catch((loadError) => {
-        setError(loadError instanceof Error ? loadError.message : "Failed to load");
-        setProgressPercent(0);
-        setPhase("error");
+        speedTest.setError(loadError instanceof Error ? loadError.message : "Failed to load");
+        speedTest.setPhase("error");
       });
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      void refreshActiveTests();
-    }, 5000);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      terminateCurrentWorkerRun();
-      stopHeartbeat();
-      stopAdminEntryResetTimer();
-      if (activeSessionRef.current) {
-        void finishActiveTestSession(activeSessionRef.current).catch(() => undefined);
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -232,99 +170,43 @@ function SpeedTestApp() {
   async function startTest() {
     if (!config || isRunning || testBlocked || concurrencyFull) return;
 
-    terminateCurrentWorkerRun();
-    const runId = testRunIdRef.current + 1;
-    testRunIdRef.current = runId;
-    setError(null);
+    speedTest.terminate();
+    speedTest.setError(null);
+    setLastSavedResult(null);
+    setReportError(null);
+
     let sessionId: string | null = null;
-    let workerRun: RunningSpeedTestWorker | null = null;
-    let latestTransferMegabits: TransferMegabits = { download: 0, upload: 0 };
     try {
       const runtimeConfig = await loadRuntimeConfig();
       setConfig(runtimeConfig);
       if (!runtimeConfig.clientSafety.canRunTest) {
-        setError(runtimeConfig.clientSafety.message ?? "This client is blocked from running speed tests.");
-        setPhase("error");
+        speedTest.setError(runtimeConfig.clientSafety.message ?? "This client is blocked from running speed tests.");
+        speedTest.setPhase("error");
         return;
       }
 
-      setResult({
-        ...emptyResult,
-        durationSeconds: runtimeConfig.defaultTestDurationSeconds,
-        parallelConnections: runtimeConfig.parallelConnections
-      });
-      setLastSavedResult(null);
-      setReportError(null);
-      setCurrentMbps(null);
-      setProgressPercent(0);
-      setMetricSeries(createEmptyMetricSeries());
-      setTransferMegabits({ download: 0, upload: 0 });
+      const activeSession = await session.beginSession();
+      sessionId = activeSession.sessionId;
 
-      const session = await startActiveTestSession();
-      sessionId = session.sessionId;
-      activeSessionRef.current = sessionId;
-      setActiveStatus(session);
-      startHeartbeat(sessionId);
+      const { measured, runId } = await speedTest.run(runtimeConfig);
 
-      workerRun = startSpeedTestWorker(runtimeConfig, (progress: TestProgress) => {
-        if (testRunIdRef.current !== runId) {
-          return;
-        }
-
-        setPhase(progress.phase);
-        if (progress.currentMbps !== undefined) {
-          setCurrentMbps(progress.currentMbps);
-        }
-        if (typeof progress.progressPercent === "number") {
-          setProgressPercent(progress.progressPercent);
-        }
-        if (typeof progress.downloadMegabits === "number" || typeof progress.uploadMegabits === "number") {
-          latestTransferMegabits = {
-            download: typeof progress.downloadMegabits === "number" ? progress.downloadMegabits : latestTransferMegabits.download,
-            upload: typeof progress.uploadMegabits === "number" ? progress.uploadMegabits : latestTransferMegabits.upload
-          };
-          setTransferMegabits(latestTransferMegabits);
-        }
-        if (progress.partial) {
-          setResult((previous) => ({ ...previous, ...progress.partial }));
-        }
-        const seriesPatch = progress.series;
-        if (seriesPatch) {
-          setMetricSeries((previous) => mergeMetricSeries(previous, seriesPatch));
-        }
-      });
-      workerRunRef.current = workerRun;
-
-      const measured = await workerRun.promise;
-      workerRun.terminate();
-      if (workerRunRef.current === workerRun) {
-        workerRunRef.current = null;
-      }
-
-      if (testRunIdRef.current === runId) {
-        setPhase("saving");
+      if (speedTest.isCurrentRun(runId)) {
+        speedTest.setPhase("saving");
       }
       const saved = await saveResult(measured);
-      if (testRunIdRef.current === runId) {
-        setResult(measured);
+      if (speedTest.isCurrentRun(runId)) {
         setLastSavedResult(saved);
-        setTransferMegabits(latestTransferMegabits);
         setRecent((items) => [saved, ...items.filter((item) => item.id !== saved.id)].slice(0, 50));
-        setProgressPercent(100);
-        setPhase("complete");
+        speedTest.setPhase("complete");
       }
     } catch (runError) {
       if (isSpeedTestWorkerAbort(runError)) return;
-      if (testRunIdRef.current === runId) {
-        setError(runError instanceof Error ? runError.message : "Test failed");
-        setPhase("error");
-      }
+      speedTest.setError(runError instanceof Error ? runError.message : "Test failed");
+      speedTest.setPhase("error");
     } finally {
-      if (workerRun && workerRunRef.current === workerRun) {
-        workerRun.terminate();
-        workerRunRef.current = null;
+      if (sessionId) {
+        await session.closeSession(sessionId);
       }
-      await finishActiveSessionForRun(sessionId, runId);
     }
   }
 
@@ -495,63 +377,10 @@ function SpeedTestApp() {
     </main>
   );
 
-  async function refreshActiveTests() {
-    try {
-      const next = await loadActiveTests();
-      setActiveStatus(next);
-    } catch {
-      // Active count is informational; avoid disrupting the speed-test workflow.
-    }
-  }
-
-  function startHeartbeat(sessionId: string) {
-    stopHeartbeat();
-    heartbeatTimerRef.current = window.setInterval(() => {
-      void heartbeatActiveTestSession(sessionId)
-        .then((next) => setActiveStatus(next))
-        .catch(() => undefined);
-    }, 3000);
-  }
-
-  function stopHeartbeat() {
-    if (heartbeatTimerRef.current !== null) {
-      window.clearInterval(heartbeatTimerRef.current);
-      heartbeatTimerRef.current = null;
-    }
-  }
-
   function stopAdminEntryResetTimer() {
     if (adminEntryResetTimerRef.current !== null) {
       window.clearTimeout(adminEntryResetTimerRef.current);
       adminEntryResetTimerRef.current = null;
-    }
-  }
-
-  function terminateCurrentWorkerRun() {
-    if (workerRunRef.current) {
-      workerRunRef.current.terminate();
-      workerRunRef.current = null;
-    }
-  }
-
-  async function finishActiveSessionForRun(sessionId: string | null, runId: number) {
-    if (!sessionId) return;
-
-    const isCurrentRun = testRunIdRef.current === runId && activeSessionRef.current === sessionId;
-    if (isCurrentRun) {
-      stopHeartbeat();
-      activeSessionRef.current = null;
-    }
-
-    try {
-      const next = await finishActiveTestSession(sessionId);
-      if (isCurrentRun) {
-        setActiveStatus(next);
-      }
-    } catch {
-      if (isCurrentRun) {
-        await refreshActiveTests();
-      }
     }
   }
 
@@ -564,13 +393,13 @@ function SpeedTestApp() {
     }
 
     setIsDeletingRecent(true);
-    setError(null);
+    speedTest.setError(null);
     try {
       await deleteRecentResults();
       setRecent([]);
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete recent results");
-      setPhase("error");
+      speedTest.setError(deleteError instanceof Error ? deleteError.message : "Failed to delete recent results");
+      speedTest.setPhase("error");
     } finally {
       setIsDeletingRecent(false);
     }
@@ -860,6 +689,7 @@ function MetricStatsStrip({ stats }: { stats: ThroughputStats }) {
     <div className="metric-stats-strip" aria-label="Throughput summary">
       <span>Low P10 {formatNumber(stats.p10Mbps)}</span>
       <span>High P90 {formatNumber(stats.p90Mbps)}</span>
+      <span>CV {formatNumber(stats.cvPercent)}%</span>
       <span>{stats.sampleCount} samples</span>
     </div>
   );
@@ -870,7 +700,12 @@ function MetricStatsPanel({ stats }: { stats: ThroughputStats }) {
     <div className="metric-stats-panel" aria-label="Throughput percentile summary">
       <StatTile label="P10 Low" value={stats.p10Mbps} />
       <StatTile label="P50 Typical" value={stats.p50Mbps} />
+      <StatTile label="P75 Upper" value={stats.p75Mbps} />
       <StatTile label="P90 High" value={stats.p90Mbps} />
+      <div className="metric-stat-tile">
+        <span>CV</span>
+        <strong>{formatNumber(stats.cvPercent)}%</strong>
+      </div>
       <div className="metric-stat-tile">
         <span>Samples</span>
         <strong>{stats.sampleCount}</strong>
@@ -896,26 +731,6 @@ function phaseText(phase: TestPhase, result: ResultPayload, summary: CompletionS
   if (phase === "saving") return "Saving result";
   if (phase === "complete") return summary.title;
   return "Ready";
-}
-
-function mergeMetricSeries(previous: MetricSeries, next: Partial<MetricSeries>): MetricSeries {
-  return {
-    downloadMbps: next.downloadMbps ? [...next.downloadMbps] : previous.downloadMbps,
-    uploadMbps: next.uploadMbps ? [...next.uploadMbps] : previous.uploadMbps,
-    idleLatencyMs: next.idleLatencyMs ? [...next.idleLatencyMs] : previous.idleLatencyMs,
-    loadedLatencyMs: next.loadedLatencyMs ? [...next.loadedLatencyMs] : previous.loadedLatencyMs,
-    jitterMs: next.jitterMs ? [...next.jitterMs] : previous.jitterMs,
-    httpLossPercent: next.httpLossPercent ? [...next.httpLossPercent] : previous.httpLossPercent
-  };
-}
-
-function emptyThroughputStats(): ThroughputStats {
-  return {
-    p10Mbps: 0,
-    p50Mbps: 0,
-    p90Mbps: 0,
-    sampleCount: 0
-  };
 }
 
 function sparklinePoint(

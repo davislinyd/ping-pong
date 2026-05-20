@@ -1,5 +1,5 @@
 import type { ResultPayload, RuntimeConfigResponse, ThroughputStats } from "../shared/contracts";
-import { bytesToMegabits, bytesToMbps, jitter, lossPercent, median, roundTo, throughputStatsFromSamples, type ThroughputSample } from "../shared/metrics";
+import { bytesToMegabits, bytesToMbps, filterIqrOutliers, jitter, lossPercent, median, roundTo, throughputStatsFromSamples, type ThroughputSample } from "../shared/metrics";
 import { API_BASE } from "./api-base";
 
 export type TestPhase = "idle" | "latency" | "download" | "upload" | "saving" | "complete" | "error";
@@ -79,7 +79,7 @@ export async function runSpeedTest(
       series: cloneMetricSeries(series)
     });
   });
-  const idleLatencyMs = median(idleLatency.samples);
+  const idleLatencyMs = median(filterIqrOutliers(idleLatency.samples));
   const jitterMs = jitter(idleLatency.samples);
 
   onProgress({
@@ -122,7 +122,7 @@ export async function runSpeedTest(
     currentMbps: download.mbps,
     progressPercent: 100,
     downloadMegabits: download.megabits,
-    partial: { downloadMbps: download.mbps, downloadStats: download.stats, downloadLoadedLatencyMs: median(download.loadedLatency.samples) },
+    partial: { downloadMbps: download.mbps, downloadStats: download.stats, downloadLoadedLatencyMs: median(filterIqrOutliers(download.loadedLatency.samples)) },
     series: cloneMetricSeries(series)
   });
 
@@ -161,8 +161,8 @@ export async function runSpeedTest(
     downloadStats: download.stats,
     uploadStats: upload.stats,
     idleLatencyMs,
-    downloadLoadedLatencyMs: median(download.loadedLatency.samples),
-    uploadLoadedLatencyMs: median(upload.loadedLatency.samples),
+    downloadLoadedLatencyMs: median(filterIqrOutliers(download.loadedLatency.samples)),
+    uploadLoadedLatencyMs: median(filterIqrOutliers(upload.loadedLatency.samples)),
     jitterMs,
     httpLossPercent: lossPercent(totalSent, totalFailed),
     durationSeconds: config.defaultTestDurationSeconds,
@@ -293,7 +293,7 @@ async function measureDownload(
   const loadedLatency = await loadedLatencyPromise;
   const measurementElapsedMs = Math.max(1, endedAt - warmupUntil);
   const stats = throughputStatsFromSamples(throughputSamples, measurementBytes, measurementElapsedMs);
-  const mbps = stats.p50Mbps;
+  const mbps = stats.meanMbps;
   const megabits = bytesToMegabits(measurementBytes);
   onPhaseProgress?.(1);
   onMegabits?.(megabits);
@@ -365,7 +365,7 @@ async function measureUpload(
   const loadedLatency = await loadedLatencyPromise;
   const measurementElapsedMs = Math.max(1, endedAt - warmupUntil);
   const stats = throughputStatsFromSamples(throughputSamples, measurementBytes, measurementElapsedMs);
-  const mbps = stats.p50Mbps;
+  const mbps = stats.meanMbps;
   const megabits = bytesToMegabits(measurementBytes);
   onPhaseProgress?.(1);
   onMegabits?.(megabits);

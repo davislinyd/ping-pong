@@ -112,10 +112,14 @@ export type ResultPayload = {
 };
 
 export type ThroughputStats = {
+  meanMbps: number;
   p10Mbps: number;
   p50Mbps: number;
+  p75Mbps: number;
   p90Mbps: number;
+  cvPercent: number;
   sampleCount: number;
+  filteredSampleCount: number;
 };
 
 export type SavedResult = ResultPayload & {

@@ -1,4 +1,4 @@
-import { API_BASE } from "./api-base";
+import { ApiError, deleteJson, fetchJson, postJson } from "./api-base";
 import {
   BROWSER_CLIENT_ID_HEADER,
   type ActiveTestSessionResponse,
@@ -36,83 +36,36 @@ export async function loadReportContext(): Promise<ReportContextResponse> {
 }
 
 export async function startActiveTestSession(): Promise<ActiveTestSessionResponse> {
-  const response = await fetch(`${API_BASE}/api/active-tests`, {
-    method: "POST",
-    cache: "no-store"
-  });
-  if (!response.ok) {
-    if (response.status === 429) {
-      const body = (await response.json().catch(() => null)) as { message?: string } | null;
-      throw new Error(body?.message ?? "Too many users are running speed tests right now.");
+  try {
+    return await postJson<ActiveTestSessionResponse>("/api/active-tests");
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 429) {
+      const message = (error.body?.message as string | undefined) ?? "Too many users are running speed tests right now.";
+      throw new Error(message);
     }
-
-    throw new Error(`Failed to start active test session: ${response.status}`);
+    throw error;
   }
-
-  return (await response.json()) as ActiveTestSessionResponse;
 }
 
 export async function heartbeatActiveTestSession(sessionId: string): Promise<ActiveTestsResponse> {
-  const response = await fetch(`${API_BASE}/api/active-tests/${encodeURIComponent(sessionId)}/heartbeat`, {
-    method: "POST",
-    cache: "no-store"
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to heartbeat active test session: ${response.status}`);
-  }
-
-  return (await response.json()) as ActiveTestsResponse;
+  return postJson<ActiveTestsResponse>(`/api/active-tests/${encodeURIComponent(sessionId)}/heartbeat`);
 }
 
 export async function finishActiveTestSession(sessionId: string): Promise<ActiveTestsResponse> {
-  const response = await fetch(`${API_BASE}/api/active-tests/${encodeURIComponent(sessionId)}`, {
-    method: "DELETE",
-    cache: "no-store"
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to finish active test session: ${response.status}`);
-  }
-
-  return (await response.json()) as ActiveTestsResponse;
+  return deleteJson<ActiveTestsResponse>(`/api/active-tests/${encodeURIComponent(sessionId)}`);
 }
 
 export async function saveResult(payload: ResultPayload): Promise<SavedResult> {
-  const response = await fetch(`${API_BASE}/api/results`, {
-    method: "POST",
-    headers: {
-      ...browserClientHeaders(),
-      "content-type": "application/json"
-    },
+  return postJson<SavedResult>("/api/results", {
+    headers: { ...browserClientHeaders(), "content-type": "application/json" },
     body: JSON.stringify(payload)
   });
-
-  if (!response.ok) {
-    throw new Error(`Failed to save result: ${response.status}`);
-  }
-
-  return (await response.json()) as SavedResult;
 }
 
 export async function deleteRecentResults(): Promise<{ ok: true; changed: number }> {
-  const response = await fetch(`${API_BASE}/api/results`, {
-    method: "DELETE",
-    headers: browserClientHeaders(),
-    cache: "no-store"
+  return deleteJson<{ ok: true; changed: number }>("/api/results", {
+    headers: browserClientHeaders()
   });
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete recent results: ${response.status}`);
-  }
-
-  return (await response.json()) as { ok: true; changed: number };
-}
-
-async function fetchJson<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${url}`, { ...init, cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-  return (await response.json()) as T;
 }
 
 function browserClientHeaders(): Record<string, string> {

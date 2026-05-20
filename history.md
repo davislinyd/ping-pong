@@ -1,6 +1,6 @@
 # Ping Pong Project Status
 
-Last updated: 2026-05-15T00:00:00+08:00
+Last updated: 2026-05-19T00:00:00+08:00
 
 ## Current Goal
 
@@ -12,6 +12,8 @@ Ping Pong is a Node.js 24 Fastify + React app for intranet speed testing. Comple
 
 The dev setup was rearchitected to remove the Vite proxy. The browser now calls the Fastify API directly on its own port. `@fastify/cors` is registered in development mode so cross-port requests succeed without a proxy. Frontend fetch calls use a `VITE_API_BASE` env var (set via `.env.development`) so the build-time URL is explicit and production relative URLs are unaffected. The upload chunk size was reduced from 1 MB to 256 KB to increase upload sample density and bring upload sample counts closer to download.
 
+Throughput statistics were refactored: the primary download/upload speed is now a **trimmed mean** computed after IQR outlier filtering (samples outside Q1 − 1.5×IQR ~ Q3 + 1.5×IQR are dropped), instead of the previous P50. The on-screen metric panel reports P10 / P50 / P75 / P90 percentiles and a **coefficient of variation (CV)** that drives the stability grade, replacing the older `(P90 − P10) / P50` spread. `ThroughputStats` was extended with `meanMbps`, `p75Mbps`, `cvPercent`, and `filteredSampleCount`; the `results` table received six matching columns with a backfill migration so historical rows still render (CV is 0 for them since the original sample distribution is unrecoverable). The IT report PDF/HTML export now lists Mean, all four percentiles, CV, and sample counts.
+
 ## Next Action
 
 If IT needs deeper machine-level data such as Wi-Fi SSID, MAC address, hostname, route table, or CPU model, plan a separate native helper or browser extension because the current browser-only page cannot collect those fields.
@@ -19,7 +21,7 @@ If IT needs deeper machine-level data such as Wi-Fi SSID, MAC address, hostname,
 ## Verification
 
 - `npm run typecheck` passed.
-- `npm test` passed: 7 test files and 52 tests.
+- `npm test` passed: 8 test files and 62 tests.
 - `npm run build` passed.
 - Production service on port 8080 was restarted after the build; the current listener is `node dist/server/main.js` PID 40029 under `npm start` PID 39901.
 - `curl -sS http://127.0.0.1:8080/api/health` returned healthy service metadata.

@@ -26,11 +26,16 @@ export function startSpeedTestWorker(
   let terminated = false;
   let cleanup: () => void = () => undefined;
   let rejectPromise: (error: Error | DOMException) => void = () => undefined;
+  const timeoutMs = (config.defaultTestDurationSeconds + 15) * 1000;
+  const timeoutId = setTimeout(() => {
+    rejectPromise(new DOMException("Speed test timed out", "TimeoutError"));
+  }, timeoutMs);
 
   const promise = new Promise<ResultPayload>((resolve, reject) => {
     rejectPromise = reject;
 
     cleanup = () => {
+      clearTimeout(timeoutId);
       worker.removeEventListener("message", handleMessage);
       worker.removeEventListener("error", handleError);
     };

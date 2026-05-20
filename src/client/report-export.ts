@@ -251,12 +251,18 @@ export function reportSections(snapshot: ReportSnapshot): ReportSection[] {
     {
       title: "Speed Result",
       rows: [
-        { label: "Download P50", value: mbpsText(result.downloadStats.p50Mbps) },
-        { label: "Download P10 / P90", value: `${mbpsText(result.downloadStats.p10Mbps)} / ${mbpsText(result.downloadStats.p90Mbps)}` },
-        { label: "Download samples", value: String(result.downloadStats.sampleCount) },
-        { label: "Upload P50", value: mbpsText(result.uploadStats.p50Mbps) },
-        { label: "Upload P10 / P90", value: `${mbpsText(result.uploadStats.p10Mbps)} / ${mbpsText(result.uploadStats.p90Mbps)}` },
-        { label: "Upload samples", value: String(result.uploadStats.sampleCount) }
+        { label: "Download Mean", value: mbpsText(result.downloadStats.meanMbps) },
+        {
+          label: "Download P10 / P50 / P75 / P90",
+          value: `${mbpsText(result.downloadStats.p10Mbps)} / ${mbpsText(result.downloadStats.p50Mbps)} / ${mbpsText(result.downloadStats.p75Mbps)} / ${mbpsText(result.downloadStats.p90Mbps)}`
+        },
+        { label: "Download CV / samples", value: `${percentText(result.downloadStats.cvPercent)} / ${result.downloadStats.sampleCount}` },
+        { label: "Upload Mean", value: mbpsText(result.uploadStats.meanMbps) },
+        {
+          label: "Upload P10 / P50 / P75 / P90",
+          value: `${mbpsText(result.uploadStats.p10Mbps)} / ${mbpsText(result.uploadStats.p50Mbps)} / ${mbpsText(result.uploadStats.p75Mbps)} / ${mbpsText(result.uploadStats.p90Mbps)}`
+        },
+        { label: "Upload CV / samples", value: `${percentText(result.uploadStats.cvPercent)} / ${result.uploadStats.sampleCount}` }
       ]
     },
     {

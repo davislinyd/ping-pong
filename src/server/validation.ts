@@ -5,10 +5,14 @@ import { MAX_ALLOWED_TEST_BYTES } from "./config.js";
 
 const throughputStatsSchema = z
   .object({
+    meanMbps: z.number().finite().min(0).max(1_000_000),
     p10Mbps: z.number().finite().min(0).max(1_000_000),
     p50Mbps: z.number().finite().min(0).max(1_000_000),
+    p75Mbps: z.number().finite().min(0).max(1_000_000),
     p90Mbps: z.number().finite().min(0).max(1_000_000),
-    sampleCount: z.number().int().min(0).max(100_000)
+    cvPercent: z.number().finite().min(0).max(1_000_000),
+    sampleCount: z.number().int().min(0).max(100_000),
+    filteredSampleCount: z.number().int().min(0).max(100_000)
   })
   .strict();
 
@@ -32,8 +36,8 @@ export const resultPayloadSchema = z
 
     return {
       ...payload,
-      downloadMbps: downloadStats.p50Mbps,
-      uploadMbps: uploadStats.p50Mbps,
+      downloadMbps: downloadStats.meanMbps,
+      uploadMbps: uploadStats.meanMbps,
       downloadStats,
       uploadStats
     };
@@ -46,10 +50,11 @@ export const recentQuerySchema = z.object({
     .transform((value) => ["true", "1", "yes"].includes(value))
 });
 
-export const downloadQuerySchema = (maxBytes: number) =>
-  z.object({
+export function createDownloadQuerySchema(maxBytes: number) {
+  return z.object({
     bytes: z.coerce.number().int().min(1).max(maxBytes).default(Math.min(maxBytes, 16_777_216))
   });
+}
 
 const editableRuntimeSettingsBaseSchema = z
   .object({
@@ -118,9 +123,13 @@ function speedRangeSchema() {
 
 function legacyThroughputStats(mbps: number) {
   return {
+    meanMbps: mbps,
     p10Mbps: mbps,
     p50Mbps: mbps,
+    p75Mbps: mbps,
     p90Mbps: mbps,
-    sampleCount: 0
+    cvPercent: 0,
+    sampleCount: 0,
+    filteredSampleCount: 0
   };
 }

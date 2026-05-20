@@ -374,16 +374,24 @@ describe("speed test API", () => {
       downloadMbps: 120.5,
       uploadMbps: 82.4,
       downloadStats: {
+        meanMbps: 120.5,
         p10Mbps: 110.2,
         p50Mbps: 120.5,
+        p75Mbps: 126.5,
         p90Mbps: 132.9,
-        sampleCount: 52
+        cvPercent: 5.4,
+        sampleCount: 52,
+        filteredSampleCount: 50
       },
       uploadStats: {
+        meanMbps: 82.4,
         p10Mbps: 76.8,
         p50Mbps: 82.4,
+        p75Mbps: 86.0,
         p90Mbps: 90.1,
-        sampleCount: 51
+        cvPercent: 4.2,
+        sampleCount: 51,
+        filteredSampleCount: 50
       },
       idleLatencyMs: 4.8,
       downloadLoadedLatencyMs: 9.1,
@@ -486,16 +494,24 @@ describe("speed test API", () => {
       downloadMbps: 120.5,
       uploadMbps: 82.4,
       downloadStats: {
+        meanMbps: 120.5,
         p10Mbps: 110.2,
         p50Mbps: 120.5,
+        p75Mbps: 126.5,
         p90Mbps: 132.9,
-        sampleCount: 52
+        cvPercent: 5.4,
+        sampleCount: 52,
+        filteredSampleCount: 50
       },
       uploadStats: {
+        meanMbps: 82.4,
         p10Mbps: 76.8,
         p50Mbps: 82.4,
+        p75Mbps: 86.0,
         p90Mbps: 90.1,
-        sampleCount: 51
+        cvPercent: 4.2,
+        sampleCount: 51,
+        filteredSampleCount: 50
       },
       idleLatencyMs: 4.8,
       downloadLoadedLatencyMs: 9.1,
@@ -578,8 +594,8 @@ describe("speed test API", () => {
         ...payload,
         downloadMbps: 95,
         uploadMbps: 44,
-        downloadStats: { p10Mbps: 90, p50Mbps: 95, p90Mbps: 100, sampleCount: 40 },
-        uploadStats: { p10Mbps: 40, p50Mbps: 44, p90Mbps: 48, sampleCount: 40 }
+        downloadStats: { meanMbps: 95, p10Mbps: 90, p50Mbps: 95, p75Mbps: 97, p90Mbps: 100, cvPercent: 3, sampleCount: 40, filteredSampleCount: 40 },
+        uploadStats: { meanMbps: 44, p10Mbps: 40, p50Mbps: 44, p75Mbps: 46, p90Mbps: 48, cvPercent: 3, sampleCount: 40, filteredSampleCount: 40 }
       }
     });
 

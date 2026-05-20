@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_CAT_SPEED_RANGES, catSpeedStageForMbps, normalizeCatSpeedRanges } from "../src/shared/contracts";
-import { bytesToMegabits, bytesToMbps, jitter, lossPercent, median, percentile, safePercent, steadyMbpsFromSamples, throughputStatsFromSamples } from "../src/shared/metrics";
+import {
+  bytesToMegabits,
+  bytesToMbps,
+  coefficientOfVariation,
+  filterIqrOutliers,
+  jitter,
+  lossPercent,
+  median,
+  percentile,
+  quartiles,
+  safePercent,
+  standardDeviation,
+  steadyMbpsFromSamples,
+  throughputStatsFromSamples
+} from "../src/shared/metrics";
 
 describe("metric helpers", () => {
   it("calculates Mbps from effective bytes and elapsed milliseconds", () => {
@@ -39,29 +53,61 @@ describe("metric helpers", () => {
     ).toBe(110);
   });
 
-  it("summarizes throughput samples with P10, P50, P90, and sample count", () => {
+  it("summarizes throughput samples with mean, percentiles, CV, and sample count", () => {
     const samples = [10, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220].map((mbps) => ({
       bytes: mbps * 125_000,
       elapsedMs: 1000
     }));
 
     expect(throughputStatsFromSamples(samples, 0, 1000)).toEqual({
+      meanMbps: 120,
       p10Mbps: 40,
       p50Mbps: 120,
+      p75Mbps: 170,
       p90Mbps: 200,
-      sampleCount: 11
+      cvPercent: 52.71,
+      sampleCount: 11,
+      filteredSampleCount: 11
     });
+  });
+
+  it("uses IQR to drop outliers when computing mean and CV", () => {
+    const samples = [10, 11, 12, 13, 14, 15, 16, 17, 18, 1000].map((mbps) => ({
+      bytes: mbps * 125_000,
+      elapsedMs: 1000
+    }));
+
+    const stats = throughputStatsFromSamples(samples, 0, 1000);
+    expect(stats.meanMbps).toBeCloseTo(14.5, 1);
+    expect(stats.filteredSampleCount).toBe(8);
+    expect(stats.sampleCount).toBe(9);
+    expect(stats.p90Mbps).toBeGreaterThan(100);
   });
 
   it("falls back to total throughput when steady samples are insufficient", () => {
     expect(steadyMbpsFromSamples([{ bytes: 1_000_000, elapsedMs: 1000 }], 12_500_000, 1000)).toBe(100);
     expect(steadyMbpsFromSamples([], 0, 1000)).toBe(0);
     expect(throughputStatsFromSamples([{ bytes: 1_000_000, elapsedMs: 1000 }], 12_500_000, 1000)).toMatchObject({
+      meanMbps: 100,
       p10Mbps: 100,
       p50Mbps: 100,
+      p75Mbps: 100,
       p90Mbps: 100,
-      sampleCount: 1
+      cvPercent: 0,
+      sampleCount: 1,
+      filteredSampleCount: 1
     });
+  });
+
+  it("computes quartiles, IQR filter, stddev, and CV", () => {
+    expect(quartiles([1, 2, 3, 4, 5, 6, 7, 8, 9])).toEqual({ q1: 3, q3: 7, iqr: 4 });
+    expect(filterIqrOutliers([10, 11, 12, 13, 14, 15, 16, 17, 18, 1000])).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18]);
+    expect(filterIqrOutliers([1, 2, 3])).toEqual([1, 2, 3]);
+    expect(standardDeviation([2, 2, 2, 2])).toBe(0);
+    expect(standardDeviation([1, 5])).toBe(2);
+    expect(coefficientOfVariation([100, 100, 100])).toBe(0);
+    expect(coefficientOfVariation([])).toBe(0);
+    expect(coefficientOfVariation([10, 12, 14, 16])).toBeCloseTo(17.21, 1);
   });
 
   it("keeps zero-byte steady windows after measurement has started", () => {

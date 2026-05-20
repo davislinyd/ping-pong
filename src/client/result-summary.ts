@@ -131,7 +131,7 @@ function stabilitySummary(download: ThroughputStats, upload: ThroughputStats): {
     tile: {
       label: "Stability",
       value,
-      detail: `${formatPercent(spread)} P10-P90 spread`,
+      detail: `${formatPercent(spread)} coefficient of variation`,
       grade
     }
   };
@@ -196,12 +196,12 @@ function summarySubtitle(primaryLimit: SummaryLimit, limitingSide: LimitingSide,
 }
 
 function stabilitySpread(stats: ThroughputStats): number | null {
-  if (stats.sampleCount < 3 || stats.p50Mbps <= 0 || !Number.isFinite(stats.p50Mbps)) {
+  if (stats.sampleCount < 3 || !Number.isFinite(stats.cvPercent)) {
     return null;
   }
 
-  const spread = (stats.p90Mbps - stats.p10Mbps) / stats.p50Mbps;
-  return Number.isFinite(spread) && spread >= 0 ? spread : null;
+  const spread = stats.cvPercent / 100;
+  return spread >= 0 ? spread : null;
 }
 
 function gradeByThreshold(value: number, excellentMax: number, goodMax: number, fairMax: number): SummaryVerdict {

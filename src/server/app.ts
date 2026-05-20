@@ -1,6 +1,6 @@
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import fs from "node:fs";
 import path from "node:path";
 import { ZodError } from "zod";
@@ -14,7 +14,9 @@ import { ResultsRepository } from "./db.js";
 import { createDownloadStream } from "./download-stream.js";
 import { detectLocalClient } from "./local-client.js";
 import { editableDefaultsFromConfig, RuntimeSettingsService, startupSettingsFromConfig } from "./settings.js";
-import { adminLoginSchema, deleteResultsSchema, downloadQuerySchema, recentQuerySchema, resultPayloadSchema } from "./validation.js";
+import { adminLoginSchema, createDownloadQuerySchema, deleteResultsSchema, recentQuerySchema, resultPayloadSchema } from "./validation.js";
+import { requireAdmin } from "./middleware/admin-auth-hook.js";
+import { requireTestAccess } from "./middleware/test-access-hook.js";
 
 export async function createApp(config: RuntimeConfig): Promise<FastifyInstance> {
   const repository = new ResultsRepository(config.sqlitePath);
@@ -23,6 +25,9 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
   const startupSettings = startupSettingsFromConfig(config);
   const activeTests = new ActiveTestTracker(15_000, initialSettings.activeTestWarningThreshold, initialSettings.maxActiveTests);
   const adminSessions = new AdminSessionManager(config.adminPassword, config.adminSessionTtlHours);
+  let downloadSchema = createDownloadQuerySchema(initialSettings.maxTestBytes);
+  const testAccessHook = { preHandler: requireTestAccess(runtimeSettings) };
+  const adminHook = { preHandler: requireAdmin(adminSessions) };
   repository.prune(initialSettings.historyRetentionDays);
 
   const app = Fastify({
@@ -34,6 +39,17 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
 
   app.addHook("onClose", async () => {
     repository.close();
+  });
+
+  app.setErrorHandler(async (error, _request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({
+        error: "Invalid request",
+        details: error.issues.map((i) => ({ path: i.path.join("."), message: i.message }))
+      });
+    }
+    app.log.error(error);
+    return reply.code(500).send({ error: "Internal server error" });
   });
 
   app.addContentTypeParser(
@@ -88,12 +104,7 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     return activeTests.current();
   });
 
-  app.post("/api/active-tests", async (request, reply) => {
-    const blocked = blockedLocalTest(runtimeSettings.current(), request.ip);
-    if (blocked) {
-      return reply.code(403).send(blocked);
-    }
-
+  app.post("/api/active-tests", testAccessHook, async (_request, reply) => {
     reply.headers(noStoreHeaders());
     const started = activeTests.start();
     if (!started) {
@@ -107,12 +118,7 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     return reply.code(201).send(started);
   });
 
-  app.post("/api/active-tests/:sessionId/heartbeat", async (request, reply) => {
-    const blocked = blockedLocalTest(runtimeSettings.current(), request.ip);
-    if (blocked) {
-      return reply.code(403).send(blocked);
-    }
-
+  app.post("/api/active-tests/:sessionId/heartbeat", testAccessHook, async (request, reply) => {
     const { sessionId } = request.params as { sessionId: string };
     const result = activeTests.heartbeat(sessionId);
     if (!result) {
@@ -129,12 +135,7 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     return activeTests.finish(sessionId);
   });
 
-  app.get("/api/latency", async (request, reply) => {
-    const blocked = blockedLocalTest(runtimeSettings.current(), request.ip);
-    if (blocked) {
-      return reply.code(403).send(blocked);
-    }
-
+  app.get("/api/latency", testAccessHook, async (_request, reply) => {
     reply.headers(noStoreHeaders());
     return {
       ok: true,
@@ -142,14 +143,8 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     };
   });
 
-  app.get("/api/download", async (request, reply) => {
-    const settings = runtimeSettings.current();
-    const blocked = blockedLocalTest(settings, request.ip);
-    if (blocked) {
-      return reply.code(403).send(blocked);
-    }
-
-    const parsed = downloadQuerySchema(settings.maxTestBytes).safeParse(request.query);
+  app.get("/api/download", testAccessHook, async (request, reply) => {
+    const parsed = downloadSchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid download size" });
     }
@@ -165,13 +160,8 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     return reply.send(createDownloadStream(bytes));
   });
 
-  app.post("/api/upload", async (request, reply) => {
+  app.post("/api/upload", testAccessHook, async (request, reply) => {
     const settings = runtimeSettings.current();
-    const blocked = blockedLocalTest(settings, request.ip);
-    if (blocked) {
-      return reply.code(403).send(blocked);
-    }
-
     const body = request.body;
     if (!Buffer.isBuffer(body)) {
       return reply.code(415).send({ error: "Expected application/octet-stream body" });
@@ -187,13 +177,8 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     };
   });
 
-  app.post("/api/results", async (request, reply) => {
+  app.post("/api/results", testAccessHook, async (request, reply) => {
     const settings = runtimeSettings.current();
-    const blocked = blockedLocalTest(settings, request.ip);
-    if (blocked) {
-      return reply.code(403).send(blocked);
-    }
-
     const parsed = resultPayloadSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "Invalid result payload" });
@@ -288,9 +273,7 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     };
   });
 
-  app.get("/api/admin/settings", async (request, reply) => {
-    if (!ensureAdmin(adminSessions, request, reply)) return;
-
+  app.get("/api/admin/settings", adminHook, async (_request, reply) => {
     reply.headers(noStoreHeaders());
     return {
       settings: runtimeSettings.current(),
@@ -298,35 +281,22 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     };
   });
 
-  app.patch("/api/admin/settings", async (request, reply) => {
-    if (!ensureAdmin(adminSessions, request, reply)) return;
-
-    try {
-      const updated = runtimeSettings.update(request.body);
-      activeTests.updateLimits(updated.settings.activeTestWarningThreshold, updated.settings.maxActiveTests);
-      if (updated.changedKeys.length > 0) {
-        repository.recordAdminEvent("settings.updated", { changedKeys: updated.changedKeys });
-      }
-
-      reply.headers(noStoreHeaders());
-      return {
-        settings: updated.settings,
-        startup: startupSettings
-      };
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return reply.code(400).send({
-          error: "Invalid admin settings payload",
-          details: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message }))
-        });
-      }
-      throw error;
+  app.patch("/api/admin/settings", adminHook, async (request, reply) => {
+    const updated = runtimeSettings.update(request.body);
+    activeTests.updateLimits(updated.settings.activeTestWarningThreshold, updated.settings.maxActiveTests);
+    downloadSchema = createDownloadQuerySchema(updated.settings.maxTestBytes);
+    if (updated.changedKeys.length > 0) {
+      repository.recordAdminEvent("settings.updated", { changedKeys: updated.changedKeys });
     }
+
+    reply.headers(noStoreHeaders());
+    return {
+      settings: updated.settings,
+      startup: startupSettings
+    };
   });
 
-  app.get("/api/admin/status", async (request, reply) => {
-    if (!ensureAdmin(adminSessions, request, reply)) return;
-
+  app.get("/api/admin/status", adminHook, async (_request, reply) => {
     reply.headers(noStoreHeaders());
     return {
       activeTests: activeTests.current(),
@@ -335,25 +305,19 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     };
   });
 
-  app.get("/api/admin/events", async (request, reply) => {
-    if (!ensureAdmin(adminSessions, request, reply)) return;
-
+  app.get("/api/admin/events", adminHook, async (request, reply) => {
     reply.headers(noStoreHeaders());
     return repository.recentAdminEvents(adminLimit(request.query));
   });
 
-  app.post("/api/admin/results/prune", async (request, reply) => {
-    if (!ensureAdmin(adminSessions, request, reply)) return;
-
+  app.post("/api/admin/results/prune", adminHook, async (_request, reply) => {
     const changed = repository.prune(runtimeSettings.current().historyRetentionDays);
     repository.recordAdminEvent("results.pruned", { changed });
     reply.headers(noStoreHeaders());
     return { ok: true, changed };
   });
 
-  app.delete("/api/admin/results", async (request, reply) => {
-    if (!ensureAdmin(adminSessions, request, reply)) return;
-
+  app.delete("/api/admin/results", adminHook, async (request, reply) => {
     const parsed = deleteResultsSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Delete results requires confirm: "DELETE_RESULTS"' });
@@ -365,9 +329,7 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     return { ok: true, changed };
   });
 
-  app.post("/api/admin/active-tests/reset", async (request, reply) => {
-    if (!ensureAdmin(adminSessions, request, reply)) return;
-
+  app.post("/api/admin/active-tests/reset", adminHook, async (_request, reply) => {
     const reset = activeTests.reset();
     repository.recordAdminEvent("active_tests.reset", { changed: reset.cleared });
     reply.headers(noStoreHeaders());
@@ -401,33 +363,6 @@ function clientSafetyForRequest(config: Pick<EditableRuntimeSettings, "allowLoca
         ? `${safety.message} Testing is disabled on this machine.`
         : safety.message
   };
-}
-
-function blockedLocalTest(config: Pick<EditableRuntimeSettings, "allowLocalSelfTest">, clientIp: string) {
-  const clientSafety = clientSafetyForRequest(config, clientIp);
-  if (clientSafety.canRunTest) {
-    return null;
-  }
-
-  return {
-    error: "Local self-tests are disabled",
-    clientSafety
-  };
-}
-
-function ensureAdmin(auth: AdminSessionManager, request: FastifyRequest, reply: FastifyReply): boolean {
-  if (!auth.isConfigured()) {
-    void reply.code(503).send({ error: "Admin password is not configured" });
-    return false;
-  }
-
-  const session = auth.sessionFromCookie(request.headers.cookie);
-  if (!session.authenticated) {
-    void reply.code(401).send({ error: "Admin login required" });
-    return false;
-  }
-
-  return true;
 }
 
 function adminLimit(query: unknown): number {

@@ -96,7 +96,7 @@ ADMIN_SESSION_TTL_HOURS=8
 
 `MAX_TEST_BYTES` limits a single download or upload request. The browser loops requests for the configured test duration instead of asking for one giant body.
 
-Download and upload are sampled in 250 ms throughput windows after a short warmup. The primary speed value is P50 Typical, with P10 Low and P90 High shown as supporting statistics so short spikes or dips do not dominate the result. Download requests are 16 MB per chunk, streamed and sampled continuously. Upload requests are 256 KB per chunk so that more round-trip completions fit inside the test window and the upload sample count stays comparable to download.
+Download and upload are sampled in 250 ms throughput windows after a short warmup. The primary speed value is the **trimmed mean**: throughput samples are sorted, samples outside the IQR fence (Q1 − 1.5×IQR, Q3 + 1.5×IQR) are dropped, and the arithmetic mean of the remaining samples is reported. P10 Low, P50 Typical, P75 Upper, and P90 High percentiles are still surfaced for reference, and the **coefficient of variation (CV = σ/mean, shown as a percentage)** is used as the stability indicator so it can be compared across very different link speeds. Download requests are 16 MB per chunk, streamed and sampled continuously. Upload requests are 256 KB per chunk so that more round-trip completions fit inside the test window and the upload sample count stays comparable to download.
 
 The accumulated `Total Download` and `Total Upload` row uses the same warmup-adjusted effective transfer bytes as the throughput calculation, converted to decimal megabits. It is a current-test UI value only; it is not saved in Recent Results and does not change the server result schema.
 
@@ -173,7 +173,7 @@ Saved fields include:
 
 - timestamp
 - server name
-- download/upload P50 Mbps plus P10/P90 summary stats and sample counts
+- download/upload trimmed-mean Mbps plus P10/P50/P75/P90 percentiles, coefficient of variation (CV %), and sample counts (raw and post-IQR-filter)
 - idle and loaded latency
 - jitter and HTTP loss
 - duration and parallel connection count

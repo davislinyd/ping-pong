@@ -22,7 +22,7 @@ export type ThroughputSample = {
 };
 
 export function steadyMbpsFromSamples(samples: ThroughputSample[], fallbackBytes: number, fallbackElapsedMs: number): number {
-  return throughputStatsFromSamples(samples, fallbackBytes, fallbackElapsedMs).p50Mbps;
+  return throughputStatsFromSamples(samples, fallbackBytes, fallbackElapsedMs).meanMbps;
 }
 
 export function throughputStatsFromSamples(samples: ThroughputSample[], fallbackBytes: number, fallbackElapsedMs: number): ThroughputStats {
@@ -37,10 +37,14 @@ export function throughputStatsFromSamples(samples: ThroughputSample[], fallback
 
   const fallbackMbps = bytesToMbps(fallbackBytes, fallbackElapsedMs);
   return {
+    meanMbps: fallbackMbps,
     p10Mbps: fallbackMbps,
     p50Mbps: fallbackMbps,
+    p75Mbps: fallbackMbps,
     p90Mbps: fallbackMbps,
-    sampleCount: mbpsSamples.length
+    cvPercent: 0,
+    sampleCount: mbpsSamples.length,
+    filteredSampleCount: mbpsSamples.length
   };
 }
 
@@ -58,12 +62,50 @@ export function percentile(values: number[], targetPercentile: number): number {
   return roundTo(lower + (upper - lower) * (rank - lowerIndex));
 }
 
+export function quartiles(values: number[]): { q1: number; q3: number; iqr: number } {
+  const q1 = percentile(values, 25);
+  const q3 = percentile(values, 75);
+  return { q1, q3, iqr: q3 - q1 };
+}
+
+export function filterIqrOutliers(values: number[]): number[] {
+  const finite = values.filter(Number.isFinite);
+  if (finite.length < 4) return finite;
+  const { q1, q3, iqr } = quartiles(finite);
+  const lower = q1 - 1.5 * iqr;
+  const upper = q3 + 1.5 * iqr;
+  return finite.filter((value) => value >= lower && value <= upper);
+}
+
+export function standardDeviation(values: number[]): number {
+  const finite = values.filter(Number.isFinite);
+  if (finite.length === 0) return 0;
+  const mean = finite.reduce((sum, value) => sum + value, 0) / finite.length;
+  const variance = finite.reduce((sum, value) => sum + (value - mean) ** 2, 0) / finite.length;
+  return roundTo(Math.sqrt(variance));
+}
+
+export function coefficientOfVariation(values: number[]): number {
+  const finite = values.filter(Number.isFinite);
+  if (finite.length === 0) return 0;
+  const mean = finite.reduce((sum, value) => sum + value, 0) / finite.length;
+  if (mean <= 0) return 0;
+  return roundTo((standardDeviation(finite) / mean) * 100);
+}
+
 function statsFromMbpsSamples(samples: number[]): ThroughputStats {
+  const filtered = filterIqrOutliers(samples);
+  const meanSource = filtered.length > 0 ? filtered : samples;
+  const mean = meanSource.reduce((sum, value) => sum + value, 0) / Math.max(1, meanSource.length);
   return {
+    meanMbps: roundTo(mean),
     p10Mbps: percentile(samples, 10),
     p50Mbps: percentile(samples, 50),
+    p75Mbps: percentile(samples, 75),
     p90Mbps: percentile(samples, 90),
-    sampleCount: samples.length
+    cvPercent: coefficientOfVariation(meanSource),
+    sampleCount: samples.length,
+    filteredSampleCount: filtered.length
   };
 }
 
