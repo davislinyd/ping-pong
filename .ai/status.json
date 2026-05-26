@@ -1,19 +1,19 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-26T14:54:04+08:00",
+  "last_updated": "2026-05-26T21:21:26+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
   "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, current-run Raw Data popup/CSV diagnostics, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Committed and pushed the fixed-height warning carousel update to origin/main. The homepage warning carousel uses shortened one-line copy, overflow-only marquee animation, 64px desktop/tablet height, 72px mobile height, 2-second auto-rotation with hover/focus pause, and red hotspot title styling.",
-  "next_action": "Decide whether the pre-existing .gitignore, AGENTS.md, deleted Ping-Pong project docx, untracked HTML specification, docs/analysis-data-debugging.md, and docs/speed-test-statistics-whitepaper.md changes are intentional.",
+  "latest_summary": "Implemented link-aware Completion Summary stability judging: Wired and Unknown keep strict worst-grade thresholds, while Wi-Fi uses a usability-aware profile that keeps raw throughput diagnostics intact but avoids labeling usable variable Wi-Fi as unstable.",
+  "next_action": "Review and commit the Wi-Fi stability summary logic, regression tests, README and whitepaper updates, and refreshed status snapshot; keep unrelated dirty files out of that commit.",
   "git": {
     "branch": "main",
     "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "2a313e0"
+    "commit": "ef7ed47"
   },
   "verification": {
     "status": "passed",
@@ -23,29 +23,33 @@
       "git remote -v",
       "npm run typecheck",
       "npm test",
-      "git diff --check -- src/client/App.tsx src/client/styles.css README.md",
+      "npm test -- test/result-summary.test.ts",
+      "git diff --check -- src/client/result-summary.ts test/result-summary.test.ts README.md docs/speed-test-statistics-whitepaper.md",
       "npm run build",
-      "restart npm start for PORT=8200",
-      "curl -sS http://127.0.0.1:8200/api/health",
-      "Browser warning carousel QA at 1191x964, 1089x964, 1280x900, 1710x1021, and 390x844",
-      "git fetch origin main",
-      "git add -- src/client/App.tsx src/client/styles.css README.md .ai/status.json",
-      "git diff --cached --check",
-      "git commit -m \"Fix warning carousel layout\"",
-      "git push -u origin main",
-      "python /Users/lindav/git/OctoPulse/tools/validate_status.py \"/Users/lindav/git/Ping Pong/.ai/status.json\""
+      "launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest",
+      "lsof -nP -iTCP:8200 -sTCP:LISTEN",
+      "curl -fsS http://127.0.0.1:8200/api/health",
+      "curl -fsS http://127.0.0.1:8200/ | head -20",
+      "Browser Wi-Fi homepage smoke QA at 1089x964, 1280x900, 1710x1021, and 390x844"
     ],
-    "last_verified_at": "2026-05-26T14:54:04+08:00",
-    "notes": "Homepage warning-carousel verification passed. Typecheck, full Vitest suite (87 tests), whitespace diff check, and production build passed. The PORT=8200 npm start service was restarted after the final build and /api/health returned ok. Browser QA confirmed page identity, nonblank content, no framework overlay, no console warnings/errors, fixed warning heights at 64px for 1191x964, 1089x964, 1280x900, and 1710x1021, fixed 72px warning height at 390x844, no Download/Jitter or Upload/HTTP Loss overlap, no warning-driven full-page height growth on desktop viewports, mobile vertical scroll remained reachable, hotspot title color computed as rgb(180, 35, 24), auto-rotation moved between 1/2 and 2/2 at about 2-second intervals, focus pause kept the selected warning stable after the next control received focus, and long mobile warning copy used .is-marquee without increasing card height. Browser screenshot capture timed out during evidence collection, so rendered QA evidence was DOM, computed style, console, and interaction state. Commit 2a313e0 was pushed to origin/main after fetching origin/main and confirming no remote divergence."
+    "last_verified_at": "2026-05-26T21:21:26+08:00",
+    "notes": "Wi-Fi stability summary verification passed. Focused result-summary tests, typecheck, whitespace diff check, full Vitest suite (94 tests), and production build passed. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser QA confirmed page identity, Quick 20s and Full 30s controls, Wi-Fi selection, Start enabled after link selection, no horizontal overflow, no console warnings/errors, one-screen desktop height at 1089x964, 1280x900, and 1710x1021, and reachable vertical mobile layout at 390x844. Browser screenshots were saved under /tmp/ping-pong-wifi-stability-*.png."
   },
   "attention": [
-    "Working tree remains dirty beyond .ai/status.json because of pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, docs/analysis-data-debugging.md, and docs/speed-test-statistics-whitepaper.md.",
-    ".ai/status.json was refreshed after the push and is intentionally uncommitted as the current delivery-state snapshot.",
-    "The branch now tracks origin/main and is not ahead or behind after the push.",
+    "Current Wi-Fi stability summary changes are uncommitted in README.md, docs/speed-test-statistics-whitepaper.md, src/client/result-summary.ts, test/result-summary.test.ts, and .ai/status.json.",
+    "Working tree also remains dirty because of unrelated pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, and docs/analysis-data-debugging.md.",
+    "Branch main is ahead of origin/main by 1 commit (ef7ed47).",
     "The running service uses .env PORT=8200, not the README default 8080.",
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
+    {
+      "id": "2026-05-26T21:21:26+08:00-code-wifi-stability-profile",
+      "at": "2026-05-26T21:21:26+08:00",
+      "kind": "code",
+      "summary": "Added link-aware Completion Summary stability judging so Wi-Fi uses a usability-aware profile while Wired and Unknown keep strict worst-grade behavior.",
+      "verification": "npm test -- test/result-summary.test.ts; npm run typecheck; npm test; npm run build; restart launchd service on PORT=8200; curl health; Browser Wi-Fi homepage QA at 1089x964, 1280x900, 1710x1021, and 390x844"
+    },
     {
       "id": "2026-05-26T14:54:04+08:00-push-2a313e0",
       "at": "2026-05-26T14:54:04+08:00",
@@ -74,14 +78,6 @@
       "kind": "code",
       "summary": "Changed homepage warnings into a single carousel card with a top-right count and tightened desktop primary metric cards so Download/Upload do not overlap secondary metrics.",
       "verification": "npm run typecheck; npm test; git diff --check for changed UI files; npm run build; restart npm start on PORT=8200; curl health; Browser viewport QA at 1089x964, 1280x900, 1710x1021, and 390x844"
-    },
-    {
-      "id": "2026-05-26T13:35:03+08:00-docs-speed-test-whitepaper",
-      "at": "2026-05-26T13:35:03+08:00",
-      "kind": "docs",
-      "summary": "Added a reusable Traditional Chinese speed-test statistics whitepaper with current sampling logic, statistical definitions, stability grading, limitations, glossary, and two complete 100-sample worked examples.",
-      "commit": "d662085",
-      "verification": "Node recalculation of whitepaper sample table and documented statistics; git diff --check for docs/speed-test-statistics-whitepaper.md; heading and line-count inspection"
     }
   ]
 }

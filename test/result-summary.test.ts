@@ -51,6 +51,63 @@ describe("completion result summary", () => {
     expect(tile(summary, "Stability")?.detail).toContain("36% raw CV");
   });
 
+  it("treats usable but variable Wi-Fi as fair instead of poor", () => {
+    const summary = buildCompletionSummary(
+      baseResult({
+        networkLinkType: "wifi",
+        downloadMbps: 549.57,
+        uploadMbps: 549.57,
+        downloadStats: stats(262, 520, 667, 97, 14.89, 30.52, 82, 549.57),
+        uploadStats: stats(262, 520, 667, 97, 14.89, 30.52, 82, 549.57)
+      }),
+      DEFAULT_CAT_SPEED_RANGES
+    );
+
+    expect(summary.title).toBe("Fair connection");
+    expect(summary.primaryLimit).toBe("stability");
+    expect(summary.subtitle).toBe("Wi-Fi variability observed - usable if application experience is acceptable");
+    expect(tile(summary, "Stability")?.value).toBe("Wi-Fi variable but usable");
+    expect(tile(summary, "Stability")?.detail).toContain("30.5% raw CV");
+    expect(tile(summary, "Stability")?.detail).toContain("P10/mean 47.7%");
+    expect(tile(summary, "Stability")?.detail).toContain("15.5% outliers");
+  });
+
+  it("keeps the same variable throughput strict for wired links", () => {
+    const summary = buildCompletionSummary(
+      baseResult({
+        networkLinkType: "wired",
+        downloadMbps: 549.57,
+        uploadMbps: 549.57,
+        downloadStats: stats(262, 520, 667, 97, 14.89, 30.52, 82, 549.57),
+        uploadStats: stats(262, 520, 667, 97, 14.89, 30.52, 82, 549.57)
+      }),
+      DEFAULT_CAT_SPEED_RANGES
+    );
+
+    expect(summary.title).toBe("Needs attention");
+    expect(summary.primaryLimit).toBe("stability");
+    expect(summary.subtitle).toContain("Check switch, uplink, or server path");
+    expect(tile(summary, "Stability")?.value).toBe("Unstable");
+  });
+
+  it("keeps legacy unknown links on the strict wired-style profile", () => {
+    const summary = buildCompletionSummary(
+      baseResult({
+        networkLinkType: "unknown",
+        downloadMbps: 549.57,
+        uploadMbps: 549.57,
+        downloadStats: stats(262, 520, 667, 97, 14.89, 30.52, 82, 549.57),
+        uploadStats: stats(262, 520, 667, 97, 14.89, 30.52, 82, 549.57)
+      }),
+      DEFAULT_CAT_SPEED_RANGES
+    );
+
+    expect(summary.title).toBe("Needs attention");
+    expect(summary.primaryLimit).toBe("stability");
+    expect(summary.subtitle).not.toContain("Retry on Wired");
+    expect(tile(summary, "Stability")?.value).toBe("Unstable");
+  });
+
   it("uses low P10 to mean ratio as a stability bottleneck", () => {
     const summary = buildCompletionSummary(
       baseResult({
@@ -87,10 +144,56 @@ describe("completion result summary", () => {
   });
 
   it("adds Wi-Fi isolation guidance when stability is poor", () => {
-    const summary = buildCompletionSummary(baseResult({ jitterMs: 38, networkLinkType: "wifi" }), DEFAULT_CAT_SPEED_RANGES);
+    const summary = buildCompletionSummary(baseResult({ jitterMs: 45, networkLinkType: "wifi" }), DEFAULT_CAT_SPEED_RANGES);
 
     expect(summary.subtitle).toContain("Retry on Wired to isolate the wireless segment");
     expect(summary.networkLinkTypeLabel).toBe("Wi-Fi");
+    expect(tile(summary, "Stability")?.value).toBe("Wi-Fi unstable");
+  });
+
+  it("keeps Wi-Fi reliability failures strict", () => {
+    const summary = buildCompletionSummary(baseResult({ httpLossPercent: 3, networkLinkType: "wifi" }), DEFAULT_CAT_SPEED_RANGES);
+
+    expect(summary.primaryLimit).toBe("reliability");
+    expect(summary.subtitle).toContain("Retry on Wired to isolate the wireless segment");
+  });
+
+  it("treats very high Wi-Fi jitter as unstable", () => {
+    const summary = buildCompletionSummary(baseResult({ jitterMs: 45, networkLinkType: "wifi" }), DEFAULT_CAT_SPEED_RANGES);
+
+    expect(summary.primaryLimit).toBe("stability");
+    expect(tile(summary, "Stability")?.value).toBe("Wi-Fi unstable");
+  });
+
+  it("treats very low Wi-Fi P10 as unstable even when the stable mean is high", () => {
+    const summary = buildCompletionSummary(
+      baseResult({
+        networkLinkType: "wifi",
+        downloadMbps: 900,
+        uploadMbps: 880,
+        downloadStats: stats(40, 900, 960, 50, 5, 5),
+        uploadStats: stats(820, 880, 930, 50, 5, 5)
+      }),
+      DEFAULT_CAT_SPEED_RANGES
+    );
+
+    expect(summary.primaryLimit).toBe("stability");
+    expect(tile(summary, "Stability")?.value).toBe("Wi-Fi unstable");
+  });
+
+  it("caps Wi-Fi stability at fair when only one component is poor", () => {
+    const summary = buildCompletionSummary(
+      baseResult({
+        networkLinkType: "wifi",
+        downloadStats: stats(820, 900, 960, 50, 5, 48),
+        uploadStats: stats(820, 880, 930, 50, 5, 8)
+      }),
+      DEFAULT_CAT_SPEED_RANGES
+    );
+
+    expect(summary.title).toBe("Fair connection");
+    expect(summary.primaryLimit).toBe("stability");
+    expect(tile(summary, "Stability")?.value).toBe("Wi-Fi variable but usable");
   });
 
   it("adds wired path guidance when reliability is poor", () => {
@@ -167,9 +270,9 @@ function baseResult(patch: Partial<ResultPayload> = {}): ResultPayload {
   };
 }
 
-function stats(p10Mbps: number, p50Mbps: number, p90Mbps: number, sampleCount: number, cvPercent = 5, rawCvPercent = cvPercent, filteredSampleCount = sampleCount): ThroughputStats {
+function stats(p10Mbps: number, p50Mbps: number, p90Mbps: number, sampleCount: number, cvPercent = 5, rawCvPercent = cvPercent, filteredSampleCount = sampleCount, meanMbps = p50Mbps): ThroughputStats {
   return {
-    meanMbps: p50Mbps,
+    meanMbps,
     p10Mbps,
     p50Mbps,
     p75Mbps: (p50Mbps + p90Mbps) / 2,
