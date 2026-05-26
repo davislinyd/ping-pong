@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ResultPayload, RuntimeConfigResponse, ThroughputStats } from "../src/shared/contracts";
 import { isSpeedTestWorkerAbort, startSpeedTestWorker, type SpeedTestWorkerLike } from "../src/client/speed-test-worker-client";
@@ -6,6 +6,10 @@ import type { SpeedTestWorkerMessage, SpeedTestWorkerRequest } from "../src/clie
 import type { TestProgress } from "../src/client/speed-test-core";
 
 describe("speed test worker client", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("posts start config, forwards progress, and resolves completed results", async () => {
     const worker = new FakeWorker();
     const progress: TestProgress[] = [];
@@ -64,6 +68,46 @@ describe("speed test worker client", () => {
 
     await expect(run.promise).rejects.toThrow("Uncaught worker error");
   });
+
+  it("does not time out a 20 second test at the old 35 second limit", async () => {
+    vi.useFakeTimers();
+    const worker = new FakeWorker();
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 20 }), () => undefined, () => worker);
+    let rejected = false;
+    run.promise.catch(() => {
+      rejected = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(35_000);
+
+    expect(rejected).toBe(false);
+    run.terminate();
+    await expect(run.promise).rejects.toThrow("Speed test worker terminated.");
+  });
+
+  it("rejects a 20 second test at the full watchdog limit", async () => {
+    vi.useFakeTimers();
+    const worker = new FakeWorker();
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 20 }), () => undefined, () => worker);
+    const timeoutExpectation = expect(run.promise).rejects.toThrow("Speed test timed out");
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    await timeoutExpectation;
+  });
+
+  it("clears the watchdog when the worker completes before timeout", async () => {
+    vi.useFakeTimers();
+    const worker = new FakeWorker();
+    const result = baseResult({ durationSeconds: 20 });
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 20 }), () => undefined, () => worker);
+
+    await vi.advanceTimersByTimeAsync(59_000);
+    worker.emitMessage({ type: "complete", result });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    await expect(run.promise).resolves.toEqual(result);
+  });
 });
 
 class FakeWorker implements SpeedTestWorkerLike {
@@ -112,7 +156,7 @@ class FakeWorker implements SpeedTestWorkerLike {
   }
 }
 
-function baseConfig(): RuntimeConfigResponse {
+function baseConfig(patch: Partial<RuntimeConfigResponse> = {}): RuntimeConfigResponse {
   return {
     serverName: "Ping Pong",
     defaultTestDurationSeconds: 8,
@@ -130,7 +174,8 @@ function baseConfig(): RuntimeConfigResponse {
       canRunTest: true,
       reason: "loopback",
       message: null
-    }
+    },
+    ...patch
   };
 }
 

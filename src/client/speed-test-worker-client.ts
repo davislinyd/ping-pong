@@ -15,6 +15,7 @@ export type RunningSpeedTestWorker = {
 };
 
 type CreateSpeedTestWorker = () => SpeedTestWorkerLike;
+const SPEED_TEST_TIMEOUT_BUFFER_SECONDS = 20;
 
 export function startSpeedTestWorker(
   config: RuntimeConfigResponse,
@@ -26,7 +27,7 @@ export function startSpeedTestWorker(
   let terminated = false;
   let cleanup: () => void = () => undefined;
   let rejectPromise: (error: Error | DOMException) => void = () => undefined;
-  const timeoutMs = (config.defaultTestDurationSeconds + 15) * 1000;
+  const timeoutMs = speedTestWorkerTimeoutMs(config.defaultTestDurationSeconds);
   const timeoutId = setTimeout(() => {
     rejectPromise(new DOMException("Speed test timed out", "TimeoutError"));
   }, timeoutMs);
@@ -91,6 +92,10 @@ export function startSpeedTestWorker(
       }
     }
   };
+}
+
+function speedTestWorkerTimeoutMs(durationSeconds: number): number {
+  return (durationSeconds * 2 + SPEED_TEST_TIMEOUT_BUFFER_SECONDS) * 1000;
 }
 
 export function createSpeedTestWorker(): SpeedTestWorkerLike {
