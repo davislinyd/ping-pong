@@ -214,11 +214,16 @@ describe("RuntimeSettingsService", () => {
           download_p10_mbps AS downloadP10Mbps,
           download_p50_mbps AS downloadP50Mbps,
           download_p90_mbps AS downloadP90Mbps,
+          download_raw_cv_percent AS downloadRawCvPercent,
           download_sample_count AS downloadSampleCount,
+          download_filtered_sample_count AS downloadFilteredSampleCount,
           upload_p10_mbps AS uploadP10Mbps,
           upload_p50_mbps AS uploadP50Mbps,
           upload_p90_mbps AS uploadP90Mbps,
+          upload_raw_cv_percent AS uploadRawCvPercent,
           upload_sample_count AS uploadSampleCount,
+          upload_filtered_sample_count AS uploadFilteredSampleCount,
+          network_link_type AS networkLinkType,
           browser_client_hash AS browserClientHash
         FROM results
         WHERE id = 1
@@ -230,11 +235,16 @@ describe("RuntimeSettingsService", () => {
       downloadP10Mbps: number;
       downloadP50Mbps: number;
       downloadP90Mbps: number;
+      downloadRawCvPercent: number;
       downloadSampleCount: number;
+      downloadFilteredSampleCount: number;
       uploadP10Mbps: number;
       uploadP50Mbps: number;
       uploadP90Mbps: number;
+      uploadRawCvPercent: number;
       uploadSampleCount: number;
+      uploadFilteredSampleCount: number;
+      networkLinkType: string;
       browserClientHash: string | null;
     };
 
@@ -244,11 +254,16 @@ describe("RuntimeSettingsService", () => {
       downloadP10Mbps: 120.5,
       downloadP50Mbps: 120.5,
       downloadP90Mbps: 120.5,
+      downloadRawCvPercent: 0,
       downloadSampleCount: 0,
+      downloadFilteredSampleCount: 0,
       uploadP10Mbps: 82.4,
       uploadP50Mbps: 82.4,
       uploadP90Mbps: 82.4,
+      uploadRawCvPercent: 0,
       uploadSampleCount: 0,
+      uploadFilteredSampleCount: 0,
+      networkLinkType: "unknown",
       browserClientHash: null
     });
     migratedDb.close();

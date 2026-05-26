@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { type ResultPayload, type RuntimeConfigResponse, type ThroughputStats } from "../../shared/contracts";
+import { type NetworkLinkType, type ResultPayload, type RuntimeConfigResponse, type ThroughputStats } from "../../shared/contracts";
 import { createEmptyMetricSeries, type MetricSeries, type TestPhase, type TestProgress } from "../speed-test-core";
 import { isSpeedTestWorkerAbort, startSpeedTestWorker, type RunningSpeedTestWorker } from "../speed-test-worker-client";
 
@@ -15,7 +15,7 @@ export type SpeedTestHook = {
   error: string | null;
   setError: (error: string | null) => void;
   isRunning: boolean;
-  run: (config: RuntimeConfigResponse) => Promise<{ measured: ResultPayload; runId: number }>;
+  run: (config: RuntimeConfigResponse, networkLinkType: NetworkLinkType) => Promise<{ measured: ResultPayload; runId: number }>;
   terminate: () => void;
   isCurrentRun: (runId: number) => boolean;
 };
@@ -26,6 +26,7 @@ const emptyThroughputStats: ThroughputStats = {
   p50Mbps: 0,
   p75Mbps: 0,
   p90Mbps: 0,
+  rawCvPercent: 0,
   cvPercent: 0,
   sampleCount: 0,
   filteredSampleCount: 0
@@ -42,7 +43,8 @@ const emptyResult: ResultPayload = {
   jitterMs: 0,
   httpLossPercent: 0,
   durationSeconds: 0,
-  parallelConnections: 0
+  parallelConnections: 0,
+  networkLinkType: "unknown"
 };
 
 export function useSpeedTest(): SpeedTestHook {
@@ -75,7 +77,7 @@ export function useSpeedTest(): SpeedTestHook {
     return testRunIdRef.current === runId;
   }
 
-  async function run(config: RuntimeConfigResponse): Promise<{ measured: ResultPayload; runId: number }> {
+  async function run(config: RuntimeConfigResponse, networkLinkType: NetworkLinkType): Promise<{ measured: ResultPayload; runId: number }> {
     terminate();
     const runId = testRunIdRef.current + 1;
     testRunIdRef.current = runId;
@@ -110,11 +112,13 @@ export function useSpeedTest(): SpeedTestHook {
       workerRun.terminate();
       if (workerRunRef.current === workerRun) workerRunRef.current = null;
       if (testRunIdRef.current === runId) {
-        setResult(measured);
+        const measuredWithLinkType = { ...measured, networkLinkType };
+        setResult(measuredWithLinkType);
         setTransferMegabits({ ...latestTransfer });
         setProgressPercent(100);
+        return { measured: measuredWithLinkType, runId };
       }
-      return { measured, runId };
+      return { measured: { ...measured, networkLinkType }, runId };
     } catch (err) {
       workerRun.terminate();
       if (workerRunRef.current === workerRun) workerRunRef.current = null;

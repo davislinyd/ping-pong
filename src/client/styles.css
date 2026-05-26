@@ -361,6 +361,20 @@ button.version-pill {
   line-height: 1.45;
 }
 
+.completion-link-type {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin-top: 10px;
+  border: 1px solid #dce4ea;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #f8fafc;
+  color: #24313a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .completion-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -428,11 +442,11 @@ button.version-pill {
 .stage-copy {
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 8px;
   min-height: 0;
   border: 1px solid #edf2f6;
   border-radius: 8px;
-  padding: 14px;
+  padding: 12px;
   background: #ffffff;
 }
 
@@ -448,6 +462,112 @@ button.version-pill {
 
 .error-text {
   color: #be123c;
+}
+
+.connection-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-width: 0;
+  margin-top: 8px;
+  border-top: 1px solid #edf2f6;
+  padding-top: 8px;
+}
+
+.connection-summary-item,
+.connection-summary-message {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.connection-summary span {
+  display: block;
+  flex: 0 0 auto;
+  color: #64717d;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.connection-summary strong {
+  display: block;
+  min-width: 0;
+  color: #101418;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.connection-summary-message strong {
+  color: #64717d;
+}
+
+.link-type-selector,
+.test-duration-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.link-type-button,
+.test-duration-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid #dce4ea;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #f8fafc;
+  color: #24313a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.link-type-button:hover:not(:disabled),
+.link-type-button.is-selected,
+.test-duration-button:hover:not(:disabled),
+.test-duration-button.is-selected {
+  border-color: #0f766e;
+  background: #eefdfa;
+  color: #0f766e;
+}
+
+.link-type-button:disabled,
+.test-duration-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.link-type-button:focus-visible,
+.test-duration-button:focus-visible {
+  outline: 3px solid rgba(14, 116, 144, 0.24);
+  outline-offset: 2px;
+}
+
+.link-type-button svg,
+.test-duration-button svg {
+  flex: 0 0 auto;
+}
+
+.link-type-button span,
+.test-duration-button span,
+.test-duration-button strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.test-duration-button strong {
+  font-size: 0.86rem;
+  line-height: 1;
 }
 
 .transfer-summary {
@@ -527,7 +647,7 @@ button.version-pill {
 
 .report-actions-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -543,9 +663,13 @@ button.version-pill {
   padding: 0 10px;
   background: #f8fafc;
   color: #24313a;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 800;
   cursor: pointer;
+}
+
+.report-action-button span {
+  white-space: nowrap;
 }
 
 .report-action-button:hover:not(:disabled) {
@@ -684,7 +808,7 @@ button.version-pill {
 
 .metric-stats-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
   min-width: 0;
 }
@@ -696,7 +820,7 @@ button.version-pill {
   padding: 4px 6px;
   background: #f8fafc;
   color: #64717d;
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 800;
   line-height: 1.2;
   overflow-wrap: anywhere;
@@ -761,6 +885,80 @@ button.version-pill {
   padding: 22px;
   background: #ffffff;
   box-shadow: 0 26px 70px rgba(16, 20, 24, 0.24);
+}
+
+.history-detail-modal {
+  --tone: #0f766e;
+  gap: 18px;
+  width: min(780px, calc(100vw - 32px));
+}
+
+.history-detail-modal .metric-modal-title strong {
+  font-size: 1.4rem;
+  line-height: 1.15;
+}
+
+.history-detail-modal .metric-modal-title em {
+  display: inline-block;
+  margin-top: 7px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+.history-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-detail-tile {
+  min-width: 0;
+  border: 1px solid #edf2f6;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.history-detail-tile span,
+.history-detail-stat-panel h3 {
+  display: block;
+  color: #64717d;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.history-detail-tile strong {
+  display: inline-block;
+  margin-top: 7px;
+  color: #101418;
+  font-size: 1.18rem;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.history-detail-tile em {
+  margin-left: 5px;
+  color: #64717d;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.history-detail-stats {
+  display: grid;
+  gap: 14px;
+}
+
+.history-detail-stat-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
 }
 
 .metric-modal-header {
@@ -1029,7 +1227,13 @@ button.version-pill {
   align-items: end;
   gap: 2px;
   height: 100%;
+  border: 0;
   border-radius: 6px 6px 0 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   outline: none;
 }
 
@@ -1144,11 +1348,11 @@ button.version-pill {
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
   color: #64717d;
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.35;
-  white-space: nowrap;
 }
 
 .history-tooltip-row + .history-tooltip-row {
@@ -1156,9 +1360,12 @@ button.version-pill {
 }
 
 .history-tooltip-row strong {
+  min-width: 0;
   color: #101418;
   font-size: 0.9rem;
   line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .empty-history {
@@ -1783,7 +1990,16 @@ button.server-pill {
     font-size: 1.12rem;
   }
 
-  .primary-metrics,
+  .report-action-button {
+    gap: 4px;
+    padding: 0 6px;
+    font-size: 0.72rem;
+  }
+
+  .primary-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .secondary-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1813,6 +2029,10 @@ button.server-pill {
   }
 
   .metric-stats-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

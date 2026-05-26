@@ -8,6 +8,7 @@ type SaveContext = {
   serverName: string;
   browserFamily: string;
   clientId: string;
+  clientIp: string;
   browserClientHash: string | null;
   isLocalClient: boolean;
 };
@@ -52,15 +53,19 @@ export class ResultsRepository {
         download_p50_mbps,
         download_p75_mbps,
         download_p90_mbps,
+        download_raw_cv_percent,
         download_cv_percent,
         download_sample_count,
+        download_filtered_sample_count,
         upload_mean_mbps,
         upload_p10_mbps,
         upload_p50_mbps,
         upload_p75_mbps,
         upload_p90_mbps,
+        upload_raw_cv_percent,
         upload_cv_percent,
         upload_sample_count,
+        upload_filtered_sample_count,
         idle_latency_ms,
         download_loaded_latency_ms,
         upload_loaded_latency_ms,
@@ -68,12 +73,14 @@ export class ResultsRepository {
         http_loss_percent,
         duration_seconds,
         parallel_connections,
+        network_link_type,
         browser_family,
         client_id,
+        client_ip,
         browser_client_hash,
         is_local_client
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = statement.run(
@@ -86,15 +93,19 @@ export class ResultsRepository {
       payload.downloadStats.p50Mbps,
       payload.downloadStats.p75Mbps,
       payload.downloadStats.p90Mbps,
+      payload.downloadStats.rawCvPercent,
       payload.downloadStats.cvPercent,
       payload.downloadStats.sampleCount,
+      payload.downloadStats.filteredSampleCount,
       payload.uploadStats.meanMbps,
       payload.uploadStats.p10Mbps,
       payload.uploadStats.p50Mbps,
       payload.uploadStats.p75Mbps,
       payload.uploadStats.p90Mbps,
+      payload.uploadStats.rawCvPercent,
       payload.uploadStats.cvPercent,
       payload.uploadStats.sampleCount,
+      payload.uploadStats.filteredSampleCount,
       payload.idleLatencyMs,
       payload.downloadLoadedLatencyMs,
       payload.uploadLoadedLatencyMs,
@@ -102,8 +113,10 @@ export class ResultsRepository {
       payload.httpLossPercent,
       payload.durationSeconds,
       payload.parallelConnections,
+      payload.networkLinkType,
       context.browserFamily,
       context.clientId,
+      context.clientIp,
       context.browserClientHash,
       context.isLocalClient ? 1 : 0
     );
@@ -114,6 +127,7 @@ export class ResultsRepository {
       serverName: context.serverName,
       browserFamily: context.browserFamily,
       clientId: context.clientId,
+      clientIp: context.clientIp,
       isLocalClient: context.isLocalClient,
       ...payload
     };
@@ -138,15 +152,19 @@ export class ResultsRepository {
           download_p50_mbps AS downloadP50Mbps,
           download_p75_mbps AS downloadP75Mbps,
           download_p90_mbps AS downloadP90Mbps,
+          download_raw_cv_percent AS downloadRawCvPercent,
           download_cv_percent AS downloadCvPercent,
           download_sample_count AS downloadSampleCount,
+          download_filtered_sample_count AS downloadFilteredSampleCount,
           upload_mean_mbps AS uploadMeanMbps,
           upload_p10_mbps AS uploadP10Mbps,
           upload_p50_mbps AS uploadP50Mbps,
           upload_p75_mbps AS uploadP75Mbps,
           upload_p90_mbps AS uploadP90Mbps,
+          upload_raw_cv_percent AS uploadRawCvPercent,
           upload_cv_percent AS uploadCvPercent,
           upload_sample_count AS uploadSampleCount,
+          upload_filtered_sample_count AS uploadFilteredSampleCount,
           idle_latency_ms AS idleLatencyMs,
           download_loaded_latency_ms AS downloadLoadedLatencyMs,
           upload_loaded_latency_ms AS uploadLoadedLatencyMs,
@@ -154,8 +172,10 @@ export class ResultsRepository {
           http_loss_percent AS httpLossPercent,
           duration_seconds AS durationSeconds,
           parallel_connections AS parallelConnections,
+          network_link_type AS networkLinkType,
           browser_family AS browserFamily,
           client_id AS clientId,
+          client_ip AS clientIp,
           is_local_client AS isLocalClient
         FROM results
         WHERE browser_client_hash = ? AND (? = 1 OR is_local_client = 0)
@@ -305,15 +325,19 @@ export class ResultsRepository {
         download_p50_mbps REAL NOT NULL,
         download_p75_mbps REAL NOT NULL DEFAULT 0,
         download_p90_mbps REAL NOT NULL,
+        download_raw_cv_percent REAL NOT NULL DEFAULT 0,
         download_cv_percent REAL NOT NULL DEFAULT 0,
         download_sample_count INTEGER NOT NULL,
+        download_filtered_sample_count INTEGER NOT NULL DEFAULT 0,
         upload_mean_mbps REAL NOT NULL DEFAULT 0,
         upload_p10_mbps REAL NOT NULL,
         upload_p50_mbps REAL NOT NULL,
         upload_p75_mbps REAL NOT NULL DEFAULT 0,
         upload_p90_mbps REAL NOT NULL,
+        upload_raw_cv_percent REAL NOT NULL DEFAULT 0,
         upload_cv_percent REAL NOT NULL DEFAULT 0,
         upload_sample_count INTEGER NOT NULL,
+        upload_filtered_sample_count INTEGER NOT NULL DEFAULT 0,
         idle_latency_ms REAL NOT NULL,
         download_loaded_latency_ms REAL NOT NULL,
         upload_loaded_latency_ms REAL NOT NULL,
@@ -321,8 +345,10 @@ export class ResultsRepository {
         http_loss_percent REAL NOT NULL,
         duration_seconds INTEGER NOT NULL,
         parallel_connections INTEGER NOT NULL,
+        network_link_type TEXT NOT NULL DEFAULT 'unknown',
         browser_family TEXT NOT NULL,
         client_id TEXT NOT NULL,
+        client_ip TEXT,
         browser_client_hash TEXT,
         is_local_client INTEGER NOT NULL DEFAULT 0
       );
@@ -364,6 +390,7 @@ export class ResultsRepository {
     addedStatsColumn = this.addResultColumn(columns, "upload_p90_mbps", "upload_p90_mbps REAL NOT NULL DEFAULT 0") || addedStatsColumn;
     addedStatsColumn = this.addResultColumn(columns, "upload_sample_count", "upload_sample_count INTEGER NOT NULL DEFAULT 0") || addedStatsColumn;
     this.addResultColumn(columns, "browser_client_hash", "browser_client_hash TEXT");
+    this.addResultColumn(columns, "client_ip", "client_ip TEXT");
 
     if (addedStatsColumn) {
       this.db.exec(`
@@ -381,10 +408,15 @@ export class ResultsRepository {
 
     const addedMean = this.addResultColumn(columns, "download_mean_mbps", "download_mean_mbps REAL NOT NULL DEFAULT 0");
     const addedP75 = this.addResultColumn(columns, "download_p75_mbps", "download_p75_mbps REAL NOT NULL DEFAULT 0");
+    const addedRawCv = this.addResultColumn(columns, "download_raw_cv_percent", "download_raw_cv_percent REAL NOT NULL DEFAULT 0");
     const addedCv = this.addResultColumn(columns, "download_cv_percent", "download_cv_percent REAL NOT NULL DEFAULT 0");
     const addedUpMean = this.addResultColumn(columns, "upload_mean_mbps", "upload_mean_mbps REAL NOT NULL DEFAULT 0");
     const addedUpP75 = this.addResultColumn(columns, "upload_p75_mbps", "upload_p75_mbps REAL NOT NULL DEFAULT 0");
+    const addedUpRawCv = this.addResultColumn(columns, "upload_raw_cv_percent", "upload_raw_cv_percent REAL NOT NULL DEFAULT 0");
     const addedUpCv = this.addResultColumn(columns, "upload_cv_percent", "upload_cv_percent REAL NOT NULL DEFAULT 0");
+    const addedFilteredCount = this.addResultColumn(columns, "download_filtered_sample_count", "download_filtered_sample_count INTEGER NOT NULL DEFAULT 0");
+    const addedUpFilteredCount = this.addResultColumn(columns, "upload_filtered_sample_count", "upload_filtered_sample_count INTEGER NOT NULL DEFAULT 0");
+    this.addResultColumn(columns, "network_link_type", "network_link_type TEXT NOT NULL DEFAULT 'unknown'");
 
     if (addedMean || addedP75 || addedCv || addedUpMean || addedUpP75 || addedUpCv) {
       this.db.exec(`
@@ -395,6 +427,26 @@ export class ResultsRepository {
           upload_mean_mbps = upload_mbps,
           upload_p75_mbps = upload_p90_mbps
         WHERE download_mean_mbps = 0 AND upload_mean_mbps = 0
+      `);
+    }
+
+    if (addedFilteredCount || addedUpFilteredCount) {
+      this.db.exec(`
+        UPDATE results
+        SET
+          download_filtered_sample_count = download_sample_count,
+          upload_filtered_sample_count = upload_sample_count
+        WHERE download_filtered_sample_count = 0 AND upload_filtered_sample_count = 0
+      `);
+    }
+
+    if (addedRawCv || addedUpRawCv) {
+      this.db.exec(`
+        UPDATE results
+        SET
+          download_raw_cv_percent = download_cv_percent,
+          upload_raw_cv_percent = upload_cv_percent
+        WHERE download_raw_cv_percent = 0 AND upload_raw_cv_percent = 0
       `);
     }
   }
@@ -417,15 +469,21 @@ type ResultRow = Omit<SavedResult, "isLocalClient" | "downloadStats" | "uploadSt
   downloadP50Mbps: number;
   downloadP75Mbps: number;
   downloadP90Mbps: number;
+  downloadRawCvPercent: number;
   downloadCvPercent: number;
   downloadSampleCount: number;
+  downloadFilteredSampleCount: number;
   uploadMeanMbps: number;
   uploadP10Mbps: number;
   uploadP50Mbps: number;
   uploadP75Mbps: number;
   uploadP90Mbps: number;
+  uploadRawCvPercent: number;
   uploadCvPercent: number;
   uploadSampleCount: number;
+  uploadFilteredSampleCount: number;
+  networkLinkType: SavedResult["networkLinkType"];
+  clientIp: string | null;
 };
 
 function rowToSavedResult(row: unknown): SavedResult {
@@ -436,6 +494,7 @@ function rowToSavedResult(row: unknown): SavedResult {
     serverName: result.serverName,
     browserFamily: result.browserFamily,
     clientId: result.clientId,
+    clientIp: result.clientIp,
     isLocalClient: Boolean(result.isLocalClient),
     downloadMbps: result.downloadMbps,
     uploadMbps: result.uploadMbps,
@@ -445,9 +504,10 @@ function rowToSavedResult(row: unknown): SavedResult {
       p50Mbps: result.downloadP50Mbps,
       p75Mbps: result.downloadP75Mbps,
       p90Mbps: result.downloadP90Mbps,
+      rawCvPercent: result.downloadRawCvPercent,
       cvPercent: result.downloadCvPercent,
       sampleCount: result.downloadSampleCount,
-      filteredSampleCount: result.downloadSampleCount
+      filteredSampleCount: result.downloadFilteredSampleCount
     },
     uploadStats: {
       meanMbps: result.uploadMeanMbps,
@@ -455,9 +515,10 @@ function rowToSavedResult(row: unknown): SavedResult {
       p50Mbps: result.uploadP50Mbps,
       p75Mbps: result.uploadP75Mbps,
       p90Mbps: result.uploadP90Mbps,
+      rawCvPercent: result.uploadRawCvPercent,
       cvPercent: result.uploadCvPercent,
       sampleCount: result.uploadSampleCount,
-      filteredSampleCount: result.uploadSampleCount
+      filteredSampleCount: result.uploadFilteredSampleCount
     },
     idleLatencyMs: result.idleLatencyMs,
     downloadLoadedLatencyMs: result.downloadLoadedLatencyMs,
@@ -465,7 +526,8 @@ function rowToSavedResult(row: unknown): SavedResult {
     jitterMs: result.jitterMs,
     httpLossPercent: result.httpLossPercent,
     durationSeconds: result.durationSeconds,
-    parallelConnections: result.parallelConnections
+    parallelConnections: result.parallelConnections,
+    networkLinkType: result.networkLinkType
   };
 }
 

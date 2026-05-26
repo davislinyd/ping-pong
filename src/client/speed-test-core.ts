@@ -166,7 +166,8 @@ export async function runSpeedTest(
     jitterMs,
     httpLossPercent: lossPercent(totalSent, totalFailed),
     durationSeconds: config.defaultTestDurationSeconds,
-    parallelConnections: config.parallelConnections
+    parallelConnections: config.parallelConnections,
+    networkLinkType: "unknown"
   };
 
   onProgress({

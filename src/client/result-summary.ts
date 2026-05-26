@@ -1,8 +1,10 @@
 import {
   DEFAULT_CAT_SPEED_RANGES,
   catSpeedStageForMbps,
+  networkLinkTypeLabel,
   type CatSpeedRanges,
   type CatSpeedStage,
+  type NetworkLinkType,
   type ResultPayload,
   type ThroughputStats
 } from "../shared/contracts";
@@ -26,6 +28,7 @@ export type CompletionSummary = {
   subtitle: string;
   primaryLimit: SummaryLimit;
   limitingSide: LimitingSide;
+  networkLinkTypeLabel: string;
   tiles: SummaryTile[];
 };
 
@@ -66,14 +69,14 @@ const speedStageGrades: Record<CatSpeedStage, SummaryVerdict> = {
 
 export function buildCompletionSummary(result: ResultPayload, ranges: CatSpeedRanges = DEFAULT_CAT_SPEED_RANGES): CompletionSummary {
   const speed = speedSummary(result, ranges);
-  const stability = stabilitySummary(result.downloadStats, result.uploadStats);
+  const stability = stabilitySummary(result.downloadStats, result.uploadStats, result.jitterMs);
   const responsiveness = responsivenessSummary(Math.max(result.downloadLoadedLatencyMs, result.uploadLoadedLatencyMs));
   const reliability = reliabilitySummary(result.httpLossPercent);
   const scored: ScoredLimit[] = [
-    { limit: "speed", grade: speed.tile.grade as SummaryVerdict },
-    { limit: "responsiveness", grade: responsiveness.tile.grade as SummaryVerdict },
     { limit: "reliability", grade: reliability.tile.grade as SummaryVerdict },
-    ...(stability.tile.grade === "unknown" ? [] : [{ limit: "stability" as const, grade: stability.tile.grade }])
+    ...(stability.tile.grade === "unknown" ? [] : [{ limit: "stability" as const, grade: stability.tile.grade }]),
+    { limit: "responsiveness", grade: responsiveness.tile.grade as SummaryVerdict },
+    ...(speed.tile.grade === "poor" ? [{ limit: "speed" as const, grade: speed.tile.grade }] : [])
   ];
   const worst = scored.reduce(
     (current, candidate) => (gradeRank[candidate.grade] > gradeRank[current.grade] ? candidate : current),
@@ -83,9 +86,10 @@ export function buildCompletionSummary(result: ResultPayload, ranges: CatSpeedRa
   return {
     verdict: worst.grade,
     title: verdictTitles[worst.grade],
-    subtitle: summarySubtitle(worst.limit, speed.limitingSide, stability.tile.grade, reliability.tile.grade),
+    subtitle: summarySubtitle(worst, speed.limitingSide, stability.tile.grade, reliability.tile.grade, result.networkLinkType),
     primaryLimit: worst.limit,
     limitingSide: speed.limitingSide,
+    networkLinkTypeLabel: networkLinkTypeLabel(result.networkLinkType),
     tiles: [speed.tile, stability.tile, responsiveness.tile, reliability.tile]
   };
 }
@@ -102,15 +106,15 @@ function speedSummary(result: ResultPayload, ranges: CatSpeedRanges): { tile: Su
     tile: {
       label: "Speed Tier",
       value: speedStageLabels[stage],
-      detail: `${limitingSideDetail(limitingSide)} P50 floor ${formatMbps(floorMbps)}`,
+      detail: `${limitingSideDetail(limitingSide)} trimmed-mean floor ${formatMbps(floorMbps)}`,
       grade: speedStageGrades[stage]
     }
   };
 }
 
-function stabilitySummary(download: ThroughputStats, upload: ThroughputStats): { tile: SummaryTile; spread: number | null } {
-  const spreads = [stabilitySpread(download), stabilitySpread(upload)].filter((value): value is number => value !== null);
-  if (spreads.length === 0) {
+function stabilitySummary(download: ThroughputStats, upload: ThroughputStats, jitterMs: number): { tile: SummaryTile; spread: number | null } {
+  const rawCvValues = [stabilityRawCv(download), stabilityRawCv(upload)].filter((value): value is number => value !== null);
+  if (rawCvValues.length === 0) {
     return {
       spread: null,
       tile: {
@@ -122,16 +126,23 @@ function stabilitySummary(download: ThroughputStats, upload: ThroughputStats): {
     };
   }
 
-  const spread = Math.max(...spreads);
-  const grade = gradeByThreshold(spread, 0.3, 0.6, 1);
+  const rawCv = Math.max(...rawCvValues);
+  const p10MeanRatio = minP10MeanRatio(download, upload);
+  const outlierRate = maxOutlierRate(download, upload);
+  const rawCvGrade = gradeByThreshold(rawCv, 10, 20, 35);
+  const ratioGrade = p10MeanRatio === null ? "excellent" : gradeByMinimum(p10MeanRatio, 0.85, 0.7, 0.5);
+  const outlierGrade = outlierRate === null ? "excellent" : gradeByThreshold(outlierRate, 2, 5, 10);
+  const jitter = safeMetric(jitterMs);
+  const jitterGrade = gradeByThreshold(jitter, 5, 15, 30);
+  const grade = worstGrade([rawCvGrade, ratioGrade, outlierGrade, jitterGrade]);
   const value = grade === "poor" ? "Unstable" : grade === "fair" ? "Variable" : "Stable";
 
   return {
-    spread,
+    spread: rawCv / 100,
     tile: {
       label: "Stability",
       value,
-      detail: `${formatPercent(spread)} coefficient of variation`,
+      detail: `${formatPercentValue(rawCv)} raw CV, P10/mean ${formatRatioPercent(p10MeanRatio)}, ${formatPercentValue(outlierRate ?? 0)} outliers, ${formatMs(jitter)} jitter`,
       grade
     }
   };
@@ -166,7 +177,11 @@ function reliabilitySummary(httpLossPercent: number): { tile: SummaryTile } {
   };
 }
 
-function summarySubtitle(primaryLimit: SummaryLimit, limitingSide: LimitingSide, stabilityGrade: SummaryGrade, reliabilityGrade: SummaryGrade): string {
+function summarySubtitle(primary: ScoredLimit, limitingSide: LimitingSide, stabilityGrade: SummaryGrade, reliabilityGrade: SummaryGrade, networkLinkType: NetworkLinkType): string {
+  if (primary.grade === "excellent") {
+    return "Stable throughput - No packet loss";
+  }
+
   const stabilityText =
     stabilityGrade === "unknown"
       ? "Stability needs more samples"
@@ -176,16 +191,16 @@ function summarySubtitle(primaryLimit: SummaryLimit, limitingSide: LimitingSide,
           ? "Variable throughput"
           : "Stable throughput";
 
-  if (primaryLimit === "reliability") {
-    return `${reliabilityGrade === "excellent" ? "No packet loss" : "Loss observed"} - Reliability is the main limit`;
+  if (primary.limit === "reliability") {
+    return addLinkDiagnosis(`${reliabilityGrade === "excellent" ? "No packet loss" : "Loss observed"} - Reliability is the main limit`, networkLinkType);
   }
 
-  if (primaryLimit === "responsiveness") {
+  if (primary.limit === "responsiveness") {
     return `${stabilityText} - Loaded latency is the main limit`;
   }
 
-  if (primaryLimit === "stability") {
-    return `${stabilityText} - Stability is the main limit`;
+  if (primary.limit === "stability") {
+    return addLinkDiagnosis(`${stabilityText} - Stability is the main limit`, networkLinkType);
   }
 
   if (limitingSide !== "balanced") {
@@ -195,13 +210,48 @@ function summarySubtitle(primaryLimit: SummaryLimit, limitingSide: LimitingSide,
   return `${stabilityText} - No packet loss`;
 }
 
-function stabilitySpread(stats: ThroughputStats): number | null {
-  if (stats.sampleCount < 3 || !Number.isFinite(stats.cvPercent)) {
+function addLinkDiagnosis(subtitle: string, networkLinkType: NetworkLinkType): string {
+  if (networkLinkType === "wifi") {
+    return `${subtitle} - Retry on Wired to isolate the wireless segment`;
+  }
+  if (networkLinkType === "wired") {
+    return `${subtitle} - Check switch, uplink, or server path`;
+  }
+  return subtitle;
+}
+
+function stabilityRawCv(stats: ThroughputStats): number | null {
+  if (stats.sampleCount < 3 || !Number.isFinite(stats.rawCvPercent)) {
     return null;
   }
 
-  const spread = stats.cvPercent / 100;
-  return spread >= 0 ? spread : null;
+  return stats.rawCvPercent >= 0 ? stats.rawCvPercent : null;
+}
+
+function minP10MeanRatio(download: ThroughputStats, upload: ThroughputStats): number | null {
+  const ratios = [p10MeanRatio(download), p10MeanRatio(upload)].filter((value): value is number => value !== null);
+  return ratios.length > 0 ? Math.min(...ratios) : null;
+}
+
+function p10MeanRatio(stats: ThroughputStats): number | null {
+  if (stats.sampleCount < 3 || !Number.isFinite(stats.p10Mbps) || !Number.isFinite(stats.meanMbps) || stats.meanMbps <= 0) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(1, stats.p10Mbps / stats.meanMbps));
+}
+
+function maxOutlierRate(download: ThroughputStats, upload: ThroughputStats): number | null {
+  const rates = [outlierRate(download), outlierRate(upload)].filter((value): value is number => value !== null);
+  return rates.length > 0 ? Math.max(...rates) : null;
+}
+
+function outlierRate(stats: ThroughputStats): number | null {
+  if (stats.sampleCount < 3 || stats.filteredSampleCount < 0 || stats.filteredSampleCount > stats.sampleCount) {
+    return null;
+  }
+
+  return ((stats.sampleCount - stats.filteredSampleCount) / stats.sampleCount) * 100;
 }
 
 function gradeByThreshold(value: number, excellentMax: number, goodMax: number, fairMax: number): SummaryVerdict {
@@ -209,6 +259,21 @@ function gradeByThreshold(value: number, excellentMax: number, goodMax: number, 
   if (value <= goodMax) return "good";
   if (value <= fairMax) return "fair";
   return "poor";
+}
+
+function gradeByMinimum(value: number, excellentMin: number, goodMin: number, fairMin: number): SummaryVerdict {
+  if (value >= excellentMin) return "excellent";
+  if (value >= goodMin) return "good";
+  if (value >= fairMin) return "fair";
+  return "poor";
+}
+
+function worseGrade(first: SummaryVerdict, second: SummaryVerdict): SummaryVerdict {
+  return gradeRank[second] > gradeRank[first] ? second : first;
+}
+
+function worstGrade(grades: SummaryVerdict[]): SummaryVerdict {
+  return grades.reduce((current, candidate) => worseGrade(current, candidate), "excellent");
 }
 
 function limitingSideFor(downloadMbps: number, uploadMbps: number): LimitingSide {
@@ -242,6 +307,10 @@ function formatPercent(spreadRatio: number): string {
 
 function formatPercentValue(value: number): string {
   return `${formatNumber(value)}%`;
+}
+
+function formatRatioPercent(value: number | null): string {
+  return value === null ? "n/a" : `${formatNumber(value * 100)}%`;
 }
 
 function formatNumber(value: number): string {

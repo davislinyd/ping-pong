@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
 import { DEFAULT_CAT_SPEED_RANGES } from "../src/shared/contracts";
 import { createApp } from "../src/server/app";
+import { browserClientHash } from "../src/server/client-identity";
 import { loadConfig } from "../src/server/config";
 
 describe("speed test API", () => {
@@ -379,6 +381,7 @@ describe("speed test API", () => {
         p50Mbps: 120.5,
         p75Mbps: 126.5,
         p90Mbps: 132.9,
+        rawCvPercent: 9.8,
         cvPercent: 5.4,
         sampleCount: 52,
         filteredSampleCount: 50
@@ -389,6 +392,7 @@ describe("speed test API", () => {
         p50Mbps: 82.4,
         p75Mbps: 86.0,
         p90Mbps: 90.1,
+        rawCvPercent: 8.6,
         cvPercent: 4.2,
         sampleCount: 51,
         filteredSampleCount: 50
@@ -399,7 +403,8 @@ describe("speed test API", () => {
       jitterMs: 1.7,
       httpLossPercent: 0,
       durationSeconds: 3,
-      parallelConnections: 2
+      parallelConnections: 2,
+      networkLinkType: "wired"
     };
 
     await app.inject({
@@ -499,6 +504,7 @@ describe("speed test API", () => {
         p50Mbps: 120.5,
         p75Mbps: 126.5,
         p90Mbps: 132.9,
+        rawCvPercent: 9.8,
         cvPercent: 5.4,
         sampleCount: 52,
         filteredSampleCount: 50
@@ -509,6 +515,7 @@ describe("speed test API", () => {
         p50Mbps: 82.4,
         p75Mbps: 86.0,
         p90Mbps: 90.1,
+        rawCvPercent: 8.6,
         cvPercent: 4.2,
         sampleCount: 51,
         filteredSampleCount: 50
@@ -519,7 +526,8 @@ describe("speed test API", () => {
       jitterMs: 1.7,
       httpLossPercent: 0,
       durationSeconds: 3,
-      parallelConnections: 2
+      parallelConnections: 2,
+      networkLinkType: "wifi"
     };
 
     const saved = await app.inject({
@@ -539,14 +547,23 @@ describe("speed test API", () => {
       serverName: "Test Node",
       browserFamily: "Chrome",
       downloadMbps: 120.5,
+      clientIp: "127.0.0.1",
       downloadStats: {
+        meanMbps: 120.5,
         p10Mbps: 110.2,
         p50Mbps: 120.5,
+        p75Mbps: 126.5,
         p90Mbps: 132.9,
-        sampleCount: 52
+        rawCvPercent: 9.8,
+        cvPercent: 5.4,
+        sampleCount: 52,
+        filteredSampleCount: 50
       },
+      networkLinkType: "wifi",
       isLocalClient: true
     });
+    expect(saved.json().downloadMbps).toBe(saved.json().downloadStats.meanMbps);
+    expect(saved.json().uploadMbps).toBe(saved.json().uploadStats.meanMbps);
     expect(saved.json().clientId).toMatch(/^[a-f0-9]{20}$/);
 
     const recent = await app.inject({
@@ -571,16 +588,27 @@ describe("speed test API", () => {
     expect(recentWithLocal.statusCode).toBe(200);
     expect(recentWithLocal.json()).toHaveLength(1);
     expect(recentWithLocal.json()[0]).toMatchObject({
+      downloadMbps: 120.5,
       uploadMbps: 82.4,
       browserFamily: "Chrome",
+      clientIp: "127.0.0.1",
       isLocalClient: true,
+      networkLinkType: "wifi",
+      downloadStats: payload.downloadStats,
       uploadStats: {
+        meanMbps: 82.4,
         p10Mbps: 76.8,
         p50Mbps: 82.4,
+        p75Mbps: 86.0,
         p90Mbps: 90.1,
-        sampleCount: 51
+        rawCvPercent: 8.6,
+        cvPercent: 4.2,
+        sampleCount: 51,
+        filteredSampleCount: 50
       }
     });
+    expect(recentWithLocal.json()[0].downloadMbps).toBe(recentWithLocal.json()[0].downloadStats.meanMbps);
+    expect(recentWithLocal.json()[0].uploadMbps).toBe(recentWithLocal.json()[0].uploadStats.meanMbps);
 
     await app.inject({
       method: "POST",
@@ -594,8 +622,9 @@ describe("speed test API", () => {
         ...payload,
         downloadMbps: 95,
         uploadMbps: 44,
-        downloadStats: { meanMbps: 95, p10Mbps: 90, p50Mbps: 95, p75Mbps: 97, p90Mbps: 100, cvPercent: 3, sampleCount: 40, filteredSampleCount: 40 },
-        uploadStats: { meanMbps: 44, p10Mbps: 40, p50Mbps: 44, p75Mbps: 46, p90Mbps: 48, cvPercent: 3, sampleCount: 40, filteredSampleCount: 40 }
+        downloadStats: { meanMbps: 95, p10Mbps: 90, p50Mbps: 95, p75Mbps: 97, p90Mbps: 100, rawCvPercent: 6, cvPercent: 3, sampleCount: 40, filteredSampleCount: 40 },
+        uploadStats: { meanMbps: 44, p10Mbps: 40, p50Mbps: 44, p75Mbps: 46, p90Mbps: 48, rawCvPercent: 6, cvPercent: 3, sampleCount: 40, filteredSampleCount: 40 },
+        networkLinkType: "wired"
       }
     });
 
@@ -623,9 +652,9 @@ describe("speed test API", () => {
     });
 
     expect(firstBrowserRecent.json()).toHaveLength(1);
-    expect(firstBrowserRecent.json()[0]).toMatchObject({ downloadMbps: 120.5, browserFamily: "Chrome" });
+    expect(firstBrowserRecent.json()[0]).toMatchObject({ downloadMbps: 120.5, browserFamily: "Chrome", clientIp: "127.0.0.1", networkLinkType: "wifi" });
     expect(secondBrowserRecent.json()).toHaveLength(1);
-    expect(secondBrowserRecent.json()[0]).toMatchObject({ downloadMbps: 95, browserFamily: "Firefox" });
+    expect(secondBrowserRecent.json()[0]).toMatchObject({ downloadMbps: 95, browserFamily: "Firefox", clientIp: "127.0.0.1", networkLinkType: "wired" });
     expect(missingBrowserRecent.json()).toHaveLength(0);
     expect(invalidBrowserRecent.json()).toHaveLength(0);
 
@@ -665,7 +694,187 @@ describe("speed test API", () => {
     expect(deletedFirstBrowser.json()).toMatchObject({ ok: true, changed: 1 });
     expect(firstBrowserAfterDelete.json()).toHaveLength(0);
     expect(secondBrowserAfterDelete.json()).toHaveLength(1);
-    expect(secondBrowserAfterDelete.json()[0]).toMatchObject({ downloadMbps: 95, browserFamily: "Firefox" });
+    expect(secondBrowserAfterDelete.json()[0]).toMatchObject({ downloadMbps: 95, browserFamily: "Firefox", clientIp: "127.0.0.1", networkLinkType: "wired" });
+  });
+
+  it("saves the trusted proxy client IP with results", async () => {
+    const proxyApp = await createApp(
+      loadConfig({
+        PORT: "8080",
+        HOST: "127.0.0.1",
+        TEST_SERVER_NAME: "Proxy Test Node",
+        SQLITE_PATH: ":memory:",
+        HISTORY_RETENTION_DAYS: "30",
+        DEFAULT_TEST_DURATION_SECONDS: "3",
+        PARALLEL_CONNECTIONS: "2",
+        MAX_TEST_BYTES: "1048576",
+        TRUST_PROXY: "true",
+        ALLOW_LOCAL_SELF_TEST: "true"
+      })
+    );
+
+    try {
+      const saved = await proxyApp.inject({
+        method: "POST",
+        url: "/api/results",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "10.20.30.40",
+          "x-ping-pong-browser-id": "33333333-3333-4333-8333-333333333333",
+          "user-agent": "Mozilla/5.0 Firefox/120.0"
+        },
+        payload: {
+          downloadMbps: 42,
+          uploadMbps: 24,
+          idleLatencyMs: 4.8,
+          downloadLoadedLatencyMs: 9.1,
+          uploadLoadedLatencyMs: 11.2,
+          jitterMs: 1.7,
+          httpLossPercent: 0,
+          durationSeconds: 3,
+          parallelConnections: 2,
+          networkLinkType: "wired"
+        }
+      });
+
+      const recent = await proxyApp.inject({
+        method: "GET",
+        url: "/api/results/recent?limit=10&includeLocal=true",
+        headers: {
+          "x-forwarded-for": "10.20.30.40",
+          "x-ping-pong-browser-id": "33333333-3333-4333-8333-333333333333"
+        }
+      });
+
+      expect(saved.statusCode).toBe(201);
+      expect(saved.json()).toMatchObject({ clientIp: "10.20.30.40", browserFamily: "Firefox" });
+      expect(recent.statusCode).toBe(200);
+      expect(recent.json()[0]).toMatchObject({ clientIp: "10.20.30.40", browserFamily: "Firefox", networkLinkType: "wired" });
+    } finally {
+      await proxyApp.close();
+    }
+  });
+
+  it("migrates legacy results without recorded client IP", async () => {
+    const browserId = "44444444-4444-4444-8444-444444444444";
+    const legacyPath = path.join(tmpDir, "legacy.sqlite");
+    const db = new DatabaseSync(legacyPath);
+    db.exec(`
+      CREATE TABLE results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL,
+        server_name TEXT NOT NULL,
+        download_mbps REAL NOT NULL,
+        upload_mbps REAL NOT NULL,
+        download_mean_mbps REAL NOT NULL DEFAULT 0,
+        download_p10_mbps REAL NOT NULL,
+        download_p50_mbps REAL NOT NULL,
+        download_p75_mbps REAL NOT NULL DEFAULT 0,
+        download_p90_mbps REAL NOT NULL,
+        download_cv_percent REAL NOT NULL DEFAULT 0,
+        download_sample_count INTEGER NOT NULL,
+        download_filtered_sample_count INTEGER NOT NULL DEFAULT 0,
+        upload_mean_mbps REAL NOT NULL DEFAULT 0,
+        upload_p10_mbps REAL NOT NULL,
+        upload_p50_mbps REAL NOT NULL,
+        upload_p75_mbps REAL NOT NULL DEFAULT 0,
+        upload_p90_mbps REAL NOT NULL,
+        upload_cv_percent REAL NOT NULL DEFAULT 0,
+        upload_sample_count INTEGER NOT NULL,
+        upload_filtered_sample_count INTEGER NOT NULL DEFAULT 0,
+        idle_latency_ms REAL NOT NULL,
+        download_loaded_latency_ms REAL NOT NULL,
+        upload_loaded_latency_ms REAL NOT NULL,
+        jitter_ms REAL NOT NULL,
+        http_loss_percent REAL NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        parallel_connections INTEGER NOT NULL,
+        network_link_type TEXT NOT NULL DEFAULT 'unknown',
+        browser_family TEXT NOT NULL,
+        client_id TEXT NOT NULL,
+        browser_client_hash TEXT,
+        is_local_client INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    db.prepare(`
+      INSERT INTO results (
+        created_at, server_name, download_mbps, upload_mbps,
+        download_mean_mbps, download_p10_mbps, download_p50_mbps, download_p75_mbps, download_p90_mbps, download_cv_percent, download_sample_count, download_filtered_sample_count,
+        upload_mean_mbps, upload_p10_mbps, upload_p50_mbps, upload_p75_mbps, upload_p90_mbps, upload_cv_percent, upload_sample_count, upload_filtered_sample_count,
+        idle_latency_ms, download_loaded_latency_ms, upload_loaded_latency_ms, jitter_ms, http_loss_percent, duration_seconds, parallel_connections,
+        network_link_type, browser_family, client_id, browser_client_hash, is_local_client
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      "2026-05-20T08:00:00.000Z",
+      "Legacy Node",
+      120,
+      80,
+      120,
+      110,
+      120,
+      125,
+      130,
+      5,
+      10,
+      10,
+      80,
+      76,
+      80,
+      84,
+      88,
+      4,
+      10,
+      10,
+      5,
+      8,
+      10,
+      1,
+      0,
+      3,
+      2,
+      "wifi",
+      "Chrome",
+      "legacy-client",
+      browserClientHash(browserId),
+      1
+    );
+    db.close();
+
+    const legacyApp = await createApp(
+      loadConfig({
+        PORT: "8080",
+        HOST: "127.0.0.1",
+        TEST_SERVER_NAME: "Legacy Test Node",
+        SQLITE_PATH: legacyPath,
+        HISTORY_RETENTION_DAYS: "30",
+        DEFAULT_TEST_DURATION_SECONDS: "3",
+        PARALLEL_CONNECTIONS: "2",
+        MAX_TEST_BYTES: "1048576",
+        TRUST_PROXY: "false",
+        ALLOW_LOCAL_SELF_TEST: "true"
+      })
+    );
+
+    try {
+      const recent = await legacyApp.inject({
+        method: "GET",
+        url: "/api/results/recent?limit=10&includeLocal=true",
+        headers: {
+          "x-ping-pong-browser-id": browserId
+        }
+      });
+
+      expect(recent.statusCode).toBe(200);
+      expect(recent.json()[0]).toMatchObject({
+        serverName: "Legacy Node",
+        clientIp: null,
+        networkLinkType: "wifi",
+        downloadStats: { cvPercent: 5, rawCvPercent: 5 },
+        uploadStats: { cvPercent: 4, rawCvPercent: 4 }
+      });
+    } finally {
+      await legacyApp.close();
+    }
   });
 
   it("accepts legacy result payloads and derives single-value throughput stats", async () => {
@@ -692,8 +901,9 @@ describe("speed test API", () => {
     expect(response.json()).toMatchObject({
       downloadMbps: 42,
       uploadMbps: 24,
-      downloadStats: { p10Mbps: 42, p50Mbps: 42, p90Mbps: 42, sampleCount: 0 },
-      uploadStats: { p10Mbps: 24, p50Mbps: 24, p90Mbps: 24, sampleCount: 0 }
+      networkLinkType: "unknown",
+      downloadStats: { p10Mbps: 42, p50Mbps: 42, p90Mbps: 42, rawCvPercent: 0, sampleCount: 0 },
+      uploadStats: { p10Mbps: 24, p50Mbps: 24, p90Mbps: 24, rawCvPercent: 0, sampleCount: 0 }
     });
   });
 

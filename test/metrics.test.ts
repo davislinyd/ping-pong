@@ -12,6 +12,7 @@ import {
   percentile,
   quartiles,
   safePercent,
+  startupDiscardCount,
   standardDeviation,
   steadyMbpsFromSamples,
   throughputStatsFromSamples
@@ -53,6 +54,13 @@ describe("metric helpers", () => {
     ).toBe(110);
   });
 
+  it("trims the first 3 percent of startup throughput samples", () => {
+    expect(startupDiscardCount(1)).toBe(0);
+    expect(startupDiscardCount(50)).toBe(2);
+    expect(startupDiscardCount(76)).toBe(3);
+    expect(startupDiscardCount(116)).toBe(4);
+  });
+
   it("summarizes throughput samples with mean, percentiles, CV, and sample count", () => {
     const samples = [10, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220].map((mbps) => ({
       bytes: mbps * 125_000,
@@ -65,6 +73,7 @@ describe("metric helpers", () => {
       p50Mbps: 120,
       p75Mbps: 170,
       p90Mbps: 200,
+      rawCvPercent: 52.71,
       cvPercent: 52.71,
       sampleCount: 11,
       filteredSampleCount: 11
@@ -79,20 +88,55 @@ describe("metric helpers", () => {
 
     const stats = throughputStatsFromSamples(samples, 0, 1000);
     expect(stats.meanMbps).toBeCloseTo(14.5, 1);
+    expect(stats.rawCvPercent).toBeGreaterThan(200);
+    expect(stats.cvPercent).toBeLessThan(20);
     expect(stats.filteredSampleCount).toBe(8);
     expect(stats.sampleCount).toBe(9);
     expect(stats.p90Mbps).toBeGreaterThan(100);
   });
 
-  it("falls back to total throughput when steady samples are insufficient", () => {
-    expect(steadyMbpsFromSamples([{ bytes: 1_000_000, elapsedMs: 1000 }], 12_500_000, 1000)).toBe(100);
-    expect(steadyMbpsFromSamples([], 0, 1000)).toBe(0);
-    expect(throughputStatsFromSamples([{ bytes: 1_000_000, elapsedMs: 1000 }], 12_500_000, 1000)).toMatchObject({
+  it("removes a proportional startup segment instead of only the first sample", () => {
+    const samples = [1000, 20, ...Array.from({ length: 48 }, () => 100)].map((mbps) => ({
+      bytes: mbps * 125_000,
+      elapsedMs: 1000
+    }));
+
+    expect(throughputStatsFromSamples(samples, 0, 1000)).toMatchObject({
       meanMbps: 100,
-      p10Mbps: 100,
+      sampleCount: 48,
+      filteredSampleCount: 48
+    });
+  });
+
+  it("keeps raw percentiles while computing the primary mean from post-startup IQR-filtered samples", () => {
+    const samples = [5, 100, 0, 100, 100, 100, 100, 100, 100, 1000].map((mbps) => ({
+      bytes: mbps * 125_000,
+      elapsedMs: 1000
+    }));
+
+    expect(throughputStatsFromSamples(samples, 0, 1000)).toEqual({
+      meanMbps: 100,
+      p10Mbps: 80,
       p50Mbps: 100,
       p75Mbps: 100,
-      p90Mbps: 100,
+      p90Mbps: 280,
+      rawCvPercent: 152.71,
+      cvPercent: 0,
+      sampleCount: 9,
+      filteredSampleCount: 7
+    });
+  });
+
+  it("uses available post-warmup samples and falls back only when none exist", () => {
+    expect(steadyMbpsFromSamples([{ bytes: 1_000_000, elapsedMs: 1000 }], 12_500_000, 1000)).toBe(8);
+    expect(steadyMbpsFromSamples([], 0, 1000)).toBe(0);
+    expect(throughputStatsFromSamples([{ bytes: 1_000_000, elapsedMs: 1000 }], 12_500_000, 1000)).toMatchObject({
+      meanMbps: 8,
+      p10Mbps: 8,
+      p50Mbps: 8,
+      p75Mbps: 8,
+      p90Mbps: 8,
+      rawCvPercent: 0,
       cvPercent: 0,
       sampleCount: 1,
       filteredSampleCount: 1

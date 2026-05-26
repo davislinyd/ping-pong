@@ -2,6 +2,7 @@ import {
   Activity,
   ArrowDown,
   ArrowUp,
+  Cable,
   Clock3,
   FileText,
   Image,
@@ -19,6 +20,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  networkLinkTypeLabel,
+  type NetworkLinkType,
+  type ReportContextResponse,
   type ResultPayload,
   type RuntimeConfigResponse,
   type SavedResult,
@@ -40,6 +44,14 @@ import { useActiveSession } from "./hooks/useActiveSession";
 import { useSpeedTest } from "./hooks/useSpeedTest";
 
 type MetricTone = "teal" | "amber" | "blue" | "rose" | "ink" | "green";
+type SelectableNetworkLinkType = Exclude<NetworkLinkType, "unknown">;
+type ConnectionContextState = {
+  status: "loading" | "ready" | "unavailable";
+  context: ReportContextResponse | null;
+};
+const TEST_DURATIONS = [20, 30] as const;
+type TestDurationSeconds = (typeof TEST_DURATIONS)[number];
+const DEFAULT_TEST_DURATION_SECONDS: TestDurationSeconds = 20;
 
 type Metric = {
   label: string;
@@ -64,6 +76,10 @@ function SpeedTestApp() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportBusyFormat, setReportBusyFormat] = useState<ReportFormat | null>(null);
   const [selectedMetricLabel, setSelectedMetricLabel] = useState<string | null>(null);
+  const [selectedHistoryResult, setSelectedHistoryResult] = useState<SavedResult | null>(null);
+  const [selectedNetworkLinkType, setSelectedNetworkLinkType] = useState<SelectableNetworkLinkType | null>(null);
+  const [selectedTestDurationSeconds, setSelectedTestDurationSeconds] = useState<TestDurationSeconds>(DEFAULT_TEST_DURATION_SECONDS);
+  const [connectionContext, setConnectionContext] = useState<ConnectionContextState>({ status: "loading", context: null });
   const [isDeletingRecent, setIsDeletingRecent] = useState(false);
   const adminEntryClickCountRef = useRef(0);
   const adminEntryResetTimerRef = useRef<number | null>(null);
@@ -82,12 +98,14 @@ function SpeedTestApp() {
   const activeTests = activeStatus.activeTests;
   const concurrencyFull = !testBlocked && activeStatus.isFull;
   const concurrencyWarning = !testBlocked && activeStatus.isWarning;
+  const actionNeedsNetworkLinkType = !selectedNetworkLinkType && !testBlocked && !concurrencyFull && !isRunning;
+  const needsNetworkLinkType = actionNeedsNetworkLinkType && phase !== "complete" && phase !== "error";
   const mainReadoutTone: MetricTone = phase === "upload" ? "amber" : "teal";
   const mainReadoutSeries = phase === "upload" ? metricSeries.uploadMbps : metricSeries.downloadMbps;
   const completionSummary = useMemo(() => buildCompletionSummary(result, config?.catSpeedRanges), [config?.catSpeedRanges, result]);
 
   useEffect(() => {
-    void Promise.all([loadRuntimeConfig(), loadRecentResults()])
+    void Promise.all([loadRuntimeConfig(), loadRecentResults(), refreshConnectionContext()])
       .then(([runtimeConfig, recentResults]) => {
         setConfig(runtimeConfig);
         setRecent(recentResults);
@@ -99,17 +117,18 @@ function SpeedTestApp() {
   }, []);
 
   useEffect(() => {
-    if (!selectedMetricLabel) return;
+    if (!selectedMetricLabel && !selectedHistoryResult) return;
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setSelectedMetricLabel(null);
+        setSelectedHistoryResult(null);
       }
     }
 
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedMetricLabel]);
+  }, [selectedMetricLabel, selectedHistoryResult]);
 
   const metrics = useMemo<Metric[]>(
     () => [
@@ -168,8 +187,9 @@ function SpeedTestApp() {
   );
 
   async function startTest() {
-    if (!config || isRunning || testBlocked || concurrencyFull) return;
+    if (!config || isRunning || testBlocked || concurrencyFull || !selectedNetworkLinkType) return;
 
+    const networkLinkType = selectedNetworkLinkType;
     speedTest.terminate();
     speedTest.setError(null);
     setLastSavedResult(null);
@@ -177,18 +197,20 @@ function SpeedTestApp() {
 
     let sessionId: string | null = null;
     try {
-      const runtimeConfig = await loadRuntimeConfig();
-      setConfig(runtimeConfig);
+      const [runtimeConfig] = await Promise.all([loadRuntimeConfig(), refreshConnectionContext()]);
+      const runConfig = { ...runtimeConfig, defaultTestDurationSeconds: selectedTestDurationSeconds };
+      setConfig(runConfig);
       if (!runtimeConfig.clientSafety.canRunTest) {
         speedTest.setError(runtimeConfig.clientSafety.message ?? "This client is blocked from running speed tests.");
         speedTest.setPhase("error");
+        setSelectedNetworkLinkType(null);
         return;
       }
 
       const activeSession = await session.beginSession();
       sessionId = activeSession.sessionId;
 
-      const { measured, runId } = await speedTest.run(runtimeConfig);
+      const { measured, runId } = await speedTest.run(runConfig, networkLinkType);
 
       if (speedTest.isCurrentRun(runId)) {
         speedTest.setPhase("saving");
@@ -198,11 +220,13 @@ function SpeedTestApp() {
         setLastSavedResult(saved);
         setRecent((items) => [saved, ...items.filter((item) => item.id !== saved.id)].slice(0, 50));
         speedTest.setPhase("complete");
+        setSelectedNetworkLinkType(null);
       }
     } catch (runError) {
       if (isSpeedTestWorkerAbort(runError)) return;
       speedTest.setError(runError instanceof Error ? runError.message : "Test failed");
       speedTest.setPhase("error");
+      setSelectedNetworkLinkType(null);
     } finally {
       if (sessionId) {
         await session.closeSession(sessionId);
@@ -210,7 +234,18 @@ function SpeedTestApp() {
     }
   }
 
-  const buttonLabel = phase === "complete" || phase === "error" ? "Retest" : "Start";
+  async function refreshConnectionContext() {
+    try {
+      const context = await loadReportContext();
+      setConnectionContext({ status: "ready", context });
+      return context;
+    } catch {
+      setConnectionContext({ status: "unavailable", context: null });
+      return null;
+    }
+  }
+
+  const buttonLabel = actionNeedsNetworkLinkType ? "Select Link" : phase === "complete" || phase === "error" ? "Retest" : "Start";
   const primaryMetrics = metrics.slice(0, 2);
   const secondaryMetrics = metrics.slice(2);
   const selectedMetric = selectedMetricLabel ? (metrics.find((metric) => metric.label === selectedMetricLabel) ?? null) : null;
@@ -322,12 +357,17 @@ function SpeedTestApp() {
                         ? "Use another device to run a valid intranet test"
                         : concurrencyFull
                           ? "Wait for an active test slot to become available"
-                          : phaseText(phase, result, completionSummary)}
+                          : needsNetworkLinkType
+                            ? "Select Wired or Wi-Fi before starting"
+                            : phaseText(phase, result, completionSummary)}
                     </p>
                   )}
+                  <ConnectionContextPanel state={connectionContext} />
                 </div>
+                <NetworkLinkSelector selected={selectedNetworkLinkType} disabled={isRunning || testBlocked || concurrencyFull} onSelect={setSelectedNetworkLinkType} />
+                <TestDurationSelector selected={selectedTestDurationSeconds} disabled={isRunning} onSelect={setSelectedTestDurationSeconds} />
                 <TransferSummary downloadMegabits={transferMegabits.download} uploadMegabits={transferMegabits.upload} />
-                <button className="primary-action" type="button" disabled={!config || isRunning || testBlocked || concurrencyFull} onClick={() => void startTest()}>
+                <button className="primary-action" type="button" disabled={!config || isRunning || testBlocked || concurrencyFull || !selectedNetworkLinkType} onClick={() => void startTest()}>
                   {isRunning ? <Loader2 className="spin" size={20} /> : <RotateCw size={20} />}
                   <span>{testBlocked ? "Blocked" : concurrencyFull ? "Full" : isRunning ? "Running" : buttonLabel}</span>
                 </button>
@@ -368,12 +408,13 @@ function SpeedTestApp() {
                 </button>
               </div>
             </div>
-            <HistoryBars results={recent} />
+            <HistoryBars results={recent} onOpen={setSelectedHistoryResult} />
           </section>
         </div>
       </div>
 
       {selectedMetric ? <MetricDetailModal metric={selectedMetric} onClose={() => setSelectedMetricLabel(null)} /> : null}
+      {selectedHistoryResult ? <HistoryDetailModal result={selectedHistoryResult} onClose={() => setSelectedHistoryResult(null)} /> : null}
     </main>
   );
 
@@ -469,6 +510,7 @@ function CompletionSummaryPanel({ summary }: { summary: CompletionSummary }) {
         <span className="completion-summary-kicker">Test Summary</span>
         <strong className="completion-summary-title">{summary.title}</strong>
         <p className="completion-summary-subtitle">{summary.subtitle}</p>
+        <span className="completion-link-type">Link: {summary.networkLinkTypeLabel}</span>
       </div>
       <div className="completion-summary-grid">
         {summary.tiles.map((tile) => (
@@ -479,6 +521,96 @@ function CompletionSummaryPanel({ summary }: { summary: CompletionSummary }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ConnectionContextPanel({ state }: { state: ConnectionContextState }) {
+  if (state.status === "ready" && state.context) {
+    return (
+      <div className="connection-summary" aria-label="Current connection IP">
+        <div className="connection-summary-item">
+          <span>Client IP</span>
+          <strong>{state.context.clientIp}</strong>
+        </div>
+        <div className="connection-summary-item">
+          <span>Source</span>
+          <strong>{connectionSourceLabel(state.context)}</strong>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`connection-summary connection-summary-${state.status}`} aria-label="Current connection IP">
+      <div className="connection-summary-message">
+        <span>Client IP</span>
+        <strong>{state.status === "loading" ? "Checking connection" : "Connection unavailable"}</strong>
+      </div>
+    </div>
+  );
+}
+
+function connectionSourceLabel(context: ReportContextResponse): string {
+  return context.ipSource === "trusted-proxy-request-ip" ? "Trusted proxy" : "Direct";
+}
+
+function NetworkLinkSelector({
+  selected,
+  disabled,
+  onSelect
+}: {
+  selected: SelectableNetworkLinkType | null;
+  disabled: boolean;
+  onSelect: (type: SelectableNetworkLinkType) => void;
+}) {
+  return (
+    <div className="link-type-selector" aria-label="Network link type">
+      <NetworkLinkButton type="wired" selected={selected === "wired"} disabled={disabled} onSelect={onSelect} />
+      <NetworkLinkButton type="wifi" selected={selected === "wifi"} disabled={disabled} onSelect={onSelect} />
+    </div>
+  );
+}
+
+function NetworkLinkButton({
+  type,
+  selected,
+  disabled,
+  onSelect
+}: {
+  type: SelectableNetworkLinkType;
+  selected: boolean;
+  disabled: boolean;
+  onSelect: (type: SelectableNetworkLinkType) => void;
+}) {
+  const Icon = type === "wired" ? Cable : Wifi;
+  const label = networkLinkTypeLabel(type);
+  return (
+    <button className={`link-type-button${selected ? " is-selected" : ""}`} type="button" aria-pressed={selected} disabled={disabled} onClick={() => onSelect(type)}>
+      <Icon size={17} strokeWidth={2.3} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function TestDurationSelector({
+  selected,
+  disabled,
+  onSelect
+}: {
+  selected: TestDurationSeconds;
+  disabled: boolean;
+  onSelect: (duration: TestDurationSeconds) => void;
+}) {
+  return (
+    <div className="test-duration-selector" aria-label="Test duration">
+      {TEST_DURATIONS.map((duration) => (
+        <button className={`test-duration-button${selected === duration ? " is-selected" : ""}`} type="button" aria-pressed={selected === duration} disabled={disabled} key={duration} onClick={() => onSelect(duration)}>
+          <Clock3 size={15} strokeWidth={2.3} />
+          <span>{duration === 20 ? "Quick" : "Full"}</span>
+          <strong>{duration}s</strong>
+        </button>
+      ))}
     </div>
   );
 }
@@ -494,6 +626,10 @@ function ReportActions({ busyFormat, error, onDownload }: { busyFormat: ReportFo
         <button className="report-action-button" type="button" disabled={busyFormat !== null} onClick={() => onDownload("png")}>
           {busyFormat === "png" ? <Loader2 className="spin" size={16} /> : <Image size={16} />}
           <span>PNG</span>
+        </button>
+        <button className="report-action-button" type="button" disabled={busyFormat !== null} onClick={() => onDownload("markdown")}>
+          {busyFormat === "markdown" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
+          <span>Markdown</span>
         </button>
       </div>
       {error ? <p className="report-error" role="status">{error}</p> : null}
@@ -540,6 +676,68 @@ function MetricDetailModal({ metric, onClose }: { metric: Metric; onClose: () =>
         <InteractiveMetricChart metric={metric} />
       </section>
     </div>
+  );
+}
+
+function HistoryDetailModal({ result, onClose }: { result: SavedResult; onClose: () => void }) {
+  return (
+    <div className="metric-modal-backdrop" onMouseDown={onClose}>
+      <section className="metric-modal history-detail-modal" role="dialog" aria-modal="true" aria-label="Recent result details" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="metric-modal-header">
+          <div className="metric-modal-title">
+            <Clock3 size={22} strokeWidth={2.2} />
+            <div>
+              <span>Recent Result</span>
+              <strong>{formatDateTime(result.createdAt)}</strong>
+              {result.isLocalClient ? <em>Local self-test</em> : null}
+            </div>
+          </div>
+          <button className="metric-modal-close" type="button" aria-label="Close recent result details" onClick={onClose}>
+            <X size={20} strokeWidth={2.2} />
+          </button>
+        </div>
+
+        <div className="history-detail-grid">
+          <HistoryDetailTile label="Download" value={formatNumber(result.downloadMbps)} unit="Mbps" />
+          <HistoryDetailTile label="Upload" value={formatNumber(result.uploadMbps)} unit="Mbps" />
+          <HistoryDetailTile label="Link" value={networkLinkTypeLabel(result.networkLinkType)} />
+          <HistoryDetailTile label="Client IP" value={resultClientIpText(result)} />
+          <HistoryDetailTile label="Server" value={result.serverName} />
+          <HistoryDetailTile label="Idle Latency" value={formatNumber(result.idleLatencyMs)} unit="ms" />
+          <HistoryDetailTile label="Download Loaded" value={formatNumber(result.downloadLoadedLatencyMs)} unit="ms" />
+          <HistoryDetailTile label="Upload Loaded" value={formatNumber(result.uploadLoadedLatencyMs)} unit="ms" />
+          <HistoryDetailTile label="Jitter" value={formatNumber(result.jitterMs)} unit="ms" />
+          <HistoryDetailTile label="HTTP Loss" value={formatNumber(result.httpLossPercent)} unit="%" />
+          <HistoryDetailTile label="Duration" value={String(result.durationSeconds)} unit="sec" />
+          <HistoryDetailTile label="Connections" value={String(result.parallelConnections)} />
+          <HistoryDetailTile label="Browser" value={result.browserFamily} />
+        </div>
+
+        <div className="history-detail-stats">
+          <HistoryStatsPanel title="Download Distribution" stats={result.downloadStats} />
+          <HistoryStatsPanel title="Upload Distribution" stats={result.uploadStats} />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function HistoryDetailTile({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <div className="history-detail-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {unit ? <em>{unit}</em> : null}
+    </div>
+  );
+}
+
+function HistoryStatsPanel({ title, stats }: { title: string; stats: ThroughputStats }) {
+  return (
+    <section className="history-detail-stat-panel" aria-label={title}>
+      <h3>{title}</h3>
+      <MetricStatsPanel stats={stats} />
+    </section>
   );
 }
 
@@ -611,7 +809,7 @@ function InteractiveMetricChart({ metric }: { metric: Metric }) {
   );
 }
 
-function HistoryBars({ results }: { results: SavedResult[] }) {
+function HistoryBars({ results, onOpen }: { results: SavedResult[]; onOpen: (result: SavedResult) => void }) {
   const visible = results.slice(0, 18).reverse();
   const max = Math.max(1, ...visible.map((item) => Math.max(item.downloadMbps, item.uploadMbps)));
 
@@ -624,13 +822,14 @@ function HistoryBars({ results }: { results: SavedResult[] }) {
       {visible.map((item, index) => {
         const tooltipId = `history-tooltip-${item.id}`;
         return (
-          <div
+          <button
             aria-describedby={tooltipId}
-            aria-label={historyItemLabel(item)}
+            aria-haspopup="dialog"
+            aria-label={`Open recent result details: ${historyItemLabel(item)}`}
             className={`history-item${item.isLocalClient ? " is-local" : ""} ${historyTooltipPlacement(index, visible.length)}`}
             key={item.id}
-            role="group"
-            tabIndex={0}
+            onClick={() => onOpen(item)}
+            type="button"
           >
             <span className="download-bar" style={{ height: `${Math.max(6, (item.downloadMbps / max) * 100)}%` }} />
             <span className="upload-bar" style={{ height: `${Math.max(6, (item.uploadMbps / max) * 100)}%` }} />
@@ -644,8 +843,16 @@ function HistoryBars({ results }: { results: SavedResult[] }) {
                 <span>Upload</span>
                 <strong>{formatNumber(item.uploadMbps)} Mbps</strong>
               </div>
+              <div className="history-tooltip-row">
+                <span>Link</span>
+                <strong>{networkLinkTypeLabel(item.networkLinkType)}</strong>
+              </div>
+              <div className="history-tooltip-row">
+                <span>Client IP</span>
+                <strong>{resultClientIpText(item)}</strong>
+              </div>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>
@@ -687,10 +894,10 @@ function MetricSparkline({ values, variant = "compact" }: { values: number[]; va
 function MetricStatsStrip({ stats }: { stats: ThroughputStats }) {
   return (
     <div className="metric-stats-strip" aria-label="Throughput summary">
-      <span>Low P10 {formatNumber(stats.p10Mbps)}</span>
-      <span>High P90 {formatNumber(stats.p90Mbps)}</span>
-      <span>CV {formatNumber(stats.cvPercent)}%</span>
-      <span>{stats.sampleCount} samples</span>
+      <span>P10 {formatNumber(stats.p10Mbps)}</span>
+      <span>P90 {formatNumber(stats.p90Mbps)}</span>
+      <span>Raw CV {formatNumber(stats.rawCvPercent)}%</span>
+      <span>Kept {stats.filteredSampleCount}/{stats.sampleCount}</span>
     </div>
   );
 }
@@ -698,17 +905,24 @@ function MetricStatsStrip({ stats }: { stats: ThroughputStats }) {
 function MetricStatsPanel({ stats }: { stats: ThroughputStats }) {
   return (
     <div className="metric-stats-panel" aria-label="Throughput percentile summary">
+      <StatTile label="Stable Mean" value={stats.meanMbps} />
       <StatTile label="P10 Low" value={stats.p10Mbps} />
       <StatTile label="P50 Typical" value={stats.p50Mbps} />
       <StatTile label="P75 Upper" value={stats.p75Mbps} />
       <StatTile label="P90 High" value={stats.p90Mbps} />
       <div className="metric-stat-tile">
-        <span>CV</span>
+        <span>Raw CV</span>
+        <strong>{formatNumber(stats.rawCvPercent)}%</strong>
+      </div>
+      <div className="metric-stat-tile">
+        <span>Stable CV</span>
         <strong>{formatNumber(stats.cvPercent)}%</strong>
       </div>
       <div className="metric-stat-tile">
-        <span>Samples</span>
-        <strong>{stats.sampleCount}</strong>
+        <span>Samples kept</span>
+        <strong>
+          {stats.filteredSampleCount}/{stats.sampleCount}
+        </strong>
       </div>
     </div>
   );
@@ -779,11 +993,15 @@ function formatDateTime(value: string): string {
 
 function historyItemLabel(item: SavedResult): string {
   const localPrefix = item.isLocalClient ? "Local self-test, " : "";
-  return `${localPrefix}${formatDateTime(item.createdAt)}, Download ${formatNumber(item.downloadMbps)} Mbps, Upload ${formatNumber(item.uploadMbps)} Mbps`;
+  return `${localPrefix}${formatDateTime(item.createdAt)}, ${networkLinkTypeLabel(item.networkLinkType)} link, Client IP ${resultClientIpText(item)}, Download ${formatNumber(item.downloadMbps)} Mbps, Upload ${formatNumber(item.uploadMbps)} Mbps`;
 }
 
 function historyTooltipPlacement(index: number, total: number): string {
   if (index <= 1) return "tooltip-left";
   if (index >= total - 2) return "tooltip-right";
   return "tooltip-center";
+}
+
+function resultClientIpText(result: SavedResult): string {
+  return result.clientIp ?? "Not recorded";
 }

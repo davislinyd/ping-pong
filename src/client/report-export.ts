@@ -1,8 +1,8 @@
-import type { ActiveTestsResponse, ReportContextResponse, RuntimeConfigResponse, SavedResult } from "../shared/contracts";
+import { networkLinkTypeLabel, type ActiveTestsResponse, type ReportContextResponse, type RuntimeConfigResponse, type SavedResult } from "../shared/contracts";
 import type { CompletionSummary } from "./result-summary";
 import type { MetricSeries } from "./speed-test-core";
 
-export type ReportFormat = "html" | "png";
+export type ReportFormat = "html" | "png" | "markdown";
 
 export type TransferMegabitsSnapshot = {
   download: number;
@@ -244,6 +244,7 @@ export function reportSections(snapshot: ReportSnapshot): ReportSection[] {
         { label: "Detail", value: snapshot.summary.subtitle },
         { label: "Primary limit", value: snapshot.summary.primaryLimit },
         { label: "Limiting side", value: snapshot.summary.limitingSide },
+        { label: "Selected link type", value: networkLinkTypeLabel(result.networkLinkType) },
         { label: "Generated at", value: timestampText(snapshot.generatedAt) },
         { label: "Result ID", value: String(result.id) }
       ]
@@ -251,18 +252,20 @@ export function reportSections(snapshot: ReportSnapshot): ReportSection[] {
     {
       title: "Speed Result",
       rows: [
-        { label: "Download Mean", value: mbpsText(result.downloadStats.meanMbps) },
+        { label: "Download Stable Mean", value: mbpsText(result.downloadStats.meanMbps) },
         {
           label: "Download P10 / P50 / P75 / P90",
           value: `${mbpsText(result.downloadStats.p10Mbps)} / ${mbpsText(result.downloadStats.p50Mbps)} / ${mbpsText(result.downloadStats.p75Mbps)} / ${mbpsText(result.downloadStats.p90Mbps)}`
         },
-        { label: "Download CV / samples", value: `${percentText(result.downloadStats.cvPercent)} / ${result.downloadStats.sampleCount}` },
-        { label: "Upload Mean", value: mbpsText(result.uploadStats.meanMbps) },
+        { label: "Download Raw CV / Stable CV", value: `${percentText(result.downloadStats.rawCvPercent)} / ${percentText(result.downloadStats.cvPercent)}` },
+        { label: "Download Samples kept", value: sampleCountText(result.downloadStats.sampleCount, result.downloadStats.filteredSampleCount) },
+        { label: "Upload Stable Mean", value: mbpsText(result.uploadStats.meanMbps) },
         {
           label: "Upload P10 / P50 / P75 / P90",
           value: `${mbpsText(result.uploadStats.p10Mbps)} / ${mbpsText(result.uploadStats.p50Mbps)} / ${mbpsText(result.uploadStats.p75Mbps)} / ${mbpsText(result.uploadStats.p90Mbps)}`
         },
-        { label: "Upload CV / samples", value: `${percentText(result.uploadStats.cvPercent)} / ${result.uploadStats.sampleCount}` }
+        { label: "Upload Raw CV / Stable CV", value: `${percentText(result.uploadStats.rawCvPercent)} / ${percentText(result.uploadStats.cvPercent)}` },
+        { label: "Upload Samples kept", value: sampleCountText(result.uploadStats.sampleCount, result.uploadStats.filteredSampleCount) }
       ]
     },
     {
@@ -313,7 +316,7 @@ export function reportSections(snapshot: ReportSnapshot): ReportSection[] {
         { label: "Anonymous client ID", value: result.clientId },
         { label: "Local self-test", value: context ? booleanText(context.clientSafety.isLocalClient) : booleanText(result.isLocalClient) },
         { label: "Client safety", value: context?.clientSafety.message ?? (result.isLocalClient ? "Local self-test result" : "No warning") },
-        { label: "Context status", value: snapshot.contextError ? `Partial: ${snapshot.contextError}` : "Complete" }
+        { label: "Context status", value: contextStatusText(snapshot) }
       ]
     },
     {
@@ -342,16 +345,77 @@ export function reportSections(snapshot: ReportSnapshot): ReportSection[] {
 export async function downloadReport(snapshot: ReportSnapshot, format: ReportFormat): Promise<void> {
   if (format === "html") {
     const blob = new Blob([renderReportHtml(snapshot)], { type: "text/html;charset=utf-8" });
-    triggerDownload(blob, reportFilename(snapshot, "html"));
+    triggerDownload(blob, reportFilename(snapshot, reportFileExtension(format)));
+    return;
+  }
+
+  if (format === "markdown") {
+    const blob = new Blob([renderReportMarkdown(snapshot)], { type: "text/markdown;charset=utf-8" });
+    triggerDownload(blob, reportFilename(snapshot, reportFileExtension(format)));
     return;
   }
 
   const blob = await renderReportPngBlob(snapshot);
-  triggerDownload(blob, reportFilename(snapshot, "png"));
+  triggerDownload(blob, reportFilename(snapshot, reportFileExtension(format)));
+}
+
+export function reportFileExtension(format: ReportFormat): "html" | "png" | "md" {
+  return format === "markdown" ? "md" : format;
+}
+
+export function renderReportMarkdown(snapshot: ReportSnapshot): string {
+  const sections = reportSections(snapshot);
+  const chartRows = reportCharts(snapshot).map((chart) => ({
+    label: chart.label,
+    value: `${formatNumber(chart.latestValue)} ${chart.unit}`,
+    samples: String(chart.values.length)
+  }));
+  const summaryFields: ReportRow[] = [
+    { label: "verdict", value: snapshot.summary.verdict },
+    { label: "verdictTitle", value: snapshot.summary.title },
+    { label: "primaryLimit", value: snapshot.summary.primaryLimit },
+    { label: "limitingSide", value: snapshot.summary.limitingSide },
+    { label: "linkType", value: networkLinkTypeLabel(snapshot.savedResult.networkLinkType) },
+    { label: "downloadMbps", value: mbpsText(snapshot.savedResult.downloadMbps) },
+    { label: "uploadMbps", value: mbpsText(snapshot.savedResult.uploadMbps) },
+    { label: "downloadRawCv", value: percentText(snapshot.savedResult.downloadStats.rawCvPercent) },
+    { label: "uploadRawCv", value: percentText(snapshot.savedResult.uploadStats.rawCvPercent) },
+    { label: "worstLoadedLatency", value: msText(Math.max(snapshot.savedResult.downloadLoadedLatencyMs, snapshot.savedResult.uploadLoadedLatencyMs)) },
+    { label: "jitter", value: msText(snapshot.savedResult.jitterMs) },
+    { label: "httpLoss", value: percentText(snapshot.savedResult.httpLossPercent) },
+    { label: "clientIp", value: snapshot.context?.clientIp ?? unavailable },
+    { label: "contextStatus", value: contextStatusText(snapshot) },
+    { label: "localSelfTest", value: booleanText(snapshot.context?.clientSafety.isLocalClient ?? snapshot.savedResult.isLocalClient) }
+  ];
+
+  return `# Ping Pong Network Quality Report
+
+## AI-readable summary
+
+\`\`\`yaml
+${summaryFields.map((row) => `${row.label}: ${yamlScalar(row.value)}`).join("\n")}
+\`\`\`
+
+## Human judgment
+
+${qualityJudgmentLines(snapshot).map((line) => `- ${line}`).join("\n")}
+
+${markdownTable("Key Metrics", reportHighlights(snapshot))}
+
+${markdownTable(
+  "Test Charts Data",
+  chartRows.map((row) => ({ label: row.label, value: `${row.value}; ${row.samples} samples` }))
+)}
+
+${sections.map((section) => markdownTable(section.title, section.rows)).join("\n\n")}
+
+_Generated by the user's browser for IT and AI evaluation. Raw IP and browser details are included only in this downloaded file and are not written to the saved results database by this export flow._
+`;
 }
 
 export function renderReportHtml(snapshot: ReportSnapshot): string {
   const sections = reportSections(snapshot);
+  const heroHtml = renderReportHeroHtml(snapshot);
   const chartHtml = renderChartsHtml(reportCharts(snapshot));
   const sectionHtml = sections
     .map(
@@ -389,6 +453,14 @@ export function renderReportHtml(snapshot: ReportSnapshot): string {
       main { max-width: 980px; margin: 0 auto; border: 1px solid #dce4ea; border-radius: 8px; padding: 32px; background: #ffffff; box-shadow: 0 18px 44px rgba(38, 47, 56, 0.08); }
       h1 { margin: 0; font-size: 2rem; line-height: 1.1; }
       .meta { margin: 8px 0 28px; color: #64717d; font-weight: 700; }
+      .hero { border: 1px solid #dce4ea; border-radius: 8px; padding: 18px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
+      .hero-kicker { margin: 0 0 6px; color: #0f766e; font-size: 0.82rem; font-weight: 800; letter-spacing: 0; text-transform: uppercase; }
+      .hero-title { margin: 0; color: #101418; font-size: 1.55rem; line-height: 1.15; }
+      .hero-copy { margin: 8px 0 0; color: #334155; font-weight: 700; line-height: 1.45; }
+      .hero-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+      .hero-card { border: 1px solid #edf2f6; border-radius: 8px; padding: 11px 12px; background: #ffffff; }
+      .hero-card span { display: block; color: #64717d; font-size: 0.72rem; font-weight: 800; line-height: 1.2; text-transform: uppercase; }
+      .hero-card strong { display: block; margin-top: 6px; color: #101418; font-size: 1rem; line-height: 1.15; overflow-wrap: anywhere; }
       section { margin-top: 24px; }
       h2 { margin: 0 0 10px; color: #0f766e; font-size: 1rem; letter-spacing: 0; text-transform: uppercase; }
       .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -411,6 +483,7 @@ export function renderReportHtml(snapshot: ReportSnapshot): string {
         th, td { display: block; width: 100%; }
         td { border-top: 0; padding-top: 0; }
         .chart-grid { grid-template-columns: 1fr; }
+        .hero-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       }
     </style>
   </head>
@@ -418,6 +491,7 @@ export function renderReportHtml(snapshot: ReportSnapshot): string {
     <main>
       <h1>Ping Pong IT Diagnostic Report</h1>
       <p class="meta">Generated ${escapeHtml(timestampText(snapshot.generatedAt))}</p>
+      ${heroHtml}
       ${chartHtml}
       ${sectionHtml}
       <p class="note">This report is generated only when the user downloads it. Raw IP and browser details are included in this file for IT evaluation and are not written to the saved results database by this export flow.</p>
@@ -503,6 +577,84 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+function renderReportHeroHtml(snapshot: ReportSnapshot): string {
+  const cards = reportHighlights(snapshot)
+    .map(
+      (row) => `
+        <div class="hero-card">
+          <span>${escapeHtml(row.label)}</span>
+          <strong>${escapeHtml(row.value)}</strong>
+        </div>
+      `
+    )
+    .join("");
+
+  return `
+    <section class="hero" aria-label="Network quality summary">
+      <p class="hero-kicker">Network Quality</p>
+      <h2 class="hero-title">${escapeHtml(snapshot.summary.title)}</h2>
+      <p class="hero-copy">${escapeHtml(snapshot.summary.subtitle)} ${escapeHtml(qualityJudgmentLines(snapshot)[0])}</p>
+      <div class="hero-grid">
+        ${cards}
+      </div>
+    </section>
+  `;
+}
+
+function reportHighlights(snapshot: ReportSnapshot): ReportRow[] {
+  const result = snapshot.savedResult;
+  return [
+    { label: "Verdict", value: snapshot.summary.title },
+    { label: "Primary limit", value: snapshot.summary.primaryLimit },
+    { label: "Selected link", value: networkLinkTypeLabel(result.networkLinkType) },
+    { label: "Download", value: mbpsText(result.downloadMbps) },
+    { label: "Upload", value: mbpsText(result.uploadMbps) },
+    { label: "Worst latency", value: msText(Math.max(result.downloadLoadedLatencyMs, result.uploadLoadedLatencyMs)) },
+    { label: "HTTP loss", value: percentText(result.httpLossPercent) },
+    { label: "Client IP", value: snapshot.context?.clientIp ?? unavailable }
+  ];
+}
+
+function qualityJudgmentLines(snapshot: ReportSnapshot): string[] {
+  const result = snapshot.savedResult;
+  const localSelfTest = snapshot.context?.clientSafety.isLocalClient ?? result.isLocalClient;
+  const lines = [
+    `Primary bottleneck: ${snapshot.summary.primaryLimit} (${snapshot.summary.limitingSide}).`,
+    `Judgment: ${snapshot.summary.subtitle}.`
+  ];
+
+  if (result.networkLinkType === "wifi" && snapshot.summary.verdict !== "excellent") {
+    lines.push("Wi-Fi isolation: rerun on Wired to separate wireless-segment issues from switch, uplink, or server-path issues.");
+  } else if (result.networkLinkType === "wired" && snapshot.summary.verdict !== "excellent") {
+    lines.push("Wired path: if this result repeats, inspect the switch, uplink, endpoint adapter, or test server path before blaming Wi-Fi.");
+  } else {
+    lines.push("Retest guidance: no immediate wired-isolation retest is indicated by this summary.");
+  }
+
+  lines.push(localSelfTest ? "Local self-test risk: yes; speed values are functional checks, not real intranet measurements." : "Local self-test risk: no.");
+  return lines;
+}
+
+function markdownTable(title: string, rows: ReportRow[]): string {
+  return `## ${escapeMarkdownText(title)}
+
+| Field | Value |
+| --- | --- |
+${rows.map((row) => `| ${escapeMarkdownCell(row.label)} | ${escapeMarkdownCell(row.value)} |`).join("\n")}`;
+}
+
+function escapeMarkdownText(value: string): string {
+  return value.replaceAll("\n", " ").trim();
+}
+
+function escapeMarkdownCell(value: string): string {
+  return escapeMarkdownText(value).replaceAll("\\", "\\\\").replaceAll("|", "\\|");
+}
+
+function yamlScalar(value: string): string {
+  return JSON.stringify(value);
+}
+
 function renderChartsHtml(charts: ReportChart[]): string {
   const chartCards = charts
     .map((chart) => {
@@ -537,6 +689,7 @@ function renderChartsHtml(charts: ReportChart[]): string {
 function measureReportHeight(context: CanvasRenderingContext2D, sections: ReportSection[], charts: ReportChart[]): number {
   let y = 146;
   context.font = "700 15px system-ui, sans-serif";
+  y += reportHeroHeight();
   y += chartSectionHeight(charts);
   for (const section of sections) {
     y += 44;
@@ -568,6 +721,7 @@ function drawReportPng(context: CanvasRenderingContext2D, snapshot: ReportSnapsh
   context.fillText(`Generated ${timestampText(snapshot.generatedAt)}`, reportMargin, y);
   y += 30;
 
+  y = drawReportHero(context, snapshot, y);
   y = drawChartSection(context, charts, y);
 
   for (const section of sections) {
@@ -596,6 +750,60 @@ function chartSectionHeight(charts: ReportChart[]): number {
   const cardHeight = 158;
   const rows = Math.ceil(charts.length / 2);
   return 22 + 18 + rows * cardHeight + Math.max(0, rows - 1) * 14 + 28;
+}
+
+function reportHeroHeight(): number {
+  return 250;
+}
+
+function drawReportHero(context: CanvasRenderingContext2D, snapshot: ReportSnapshot, startY: number): number {
+  const x = reportMargin;
+  const y = startY + 8;
+  const width = reportWidth - reportMargin * 2;
+  const height = reportHeroHeight() - 18;
+  context.fillStyle = "#ffffff";
+  roundedRect(context, x, y, width, height, 8);
+  context.fill();
+  context.strokeStyle = "#dce4ea";
+  context.stroke();
+
+  context.fillStyle = "#0f766e";
+  context.font = "800 13px system-ui, sans-serif";
+  context.fillText("NETWORK QUALITY", x + 18, y + 28);
+  context.fillStyle = "#101418";
+  context.font = "800 26px system-ui, sans-serif";
+  context.fillText(snapshot.summary.title, x + 18, y + 60);
+  context.fillStyle = "#334155";
+  context.font = "700 14px system-ui, sans-serif";
+  wrapCanvasText(context, snapshot.summary.subtitle, width - 36).slice(0, 2).forEach((line, index) => {
+    context.fillText(line, x + 18, y + 86 + index * 18);
+  });
+
+  const cards = reportHighlights(snapshot);
+  const gap = 10;
+  const cardWidth = (width - 36 - gap * 3) / 4;
+  const cardHeight = 50;
+  const cardStartY = y + 112;
+  cards.forEach((card, index) => {
+    const column = index % 4;
+    const row = Math.floor(index / 4);
+    const cardX = x + 18 + column * (cardWidth + gap);
+    const cardY = cardStartY + row * (cardHeight + gap);
+    context.fillStyle = "#f8fafc";
+    roundedRect(context, cardX, cardY, cardWidth, cardHeight, 6);
+    context.fill();
+    context.strokeStyle = "#edf2f6";
+    context.stroke();
+    context.fillStyle = "#64717d";
+    context.font = "800 11px system-ui, sans-serif";
+    context.fillText(card.label.toUpperCase(), cardX + 10, cardY + 18);
+    context.fillStyle = "#101418";
+    context.font = "800 14px system-ui, sans-serif";
+    const value = wrapCanvasText(context, card.value, cardWidth - 20)[0] ?? unavailable;
+    context.fillText(value, cardX + 10, cardY + 37);
+  });
+
+  return startY + reportHeroHeight();
 }
 
 function drawChartSection(context: CanvasRenderingContext2D, charts: ReportChart[], startY: number): number {
@@ -748,7 +956,7 @@ function triggerDownload(blob: Blob, filename: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function reportFilename(snapshot: ReportSnapshot, extension: "html" | "png"): string {
+export function reportFilename(snapshot: ReportSnapshot, extension: "html" | "png" | "md"): string {
   const stamp = snapshot.generatedAt.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z").replace("T", "-");
   return `ping-pong-report-${stamp}.${extension}`;
 }
@@ -838,6 +1046,10 @@ function booleanText(value: boolean | null | undefined): string {
   return value ? "Yes" : "No";
 }
 
+function contextStatusText(snapshot: ReportSnapshot): string {
+  return snapshot.contextError ? `Partial: ${snapshot.contextError}` : "Complete";
+}
+
 function mbpsText(value: number): string {
   return `${formatNumber(value)} Mbps`;
 }
@@ -848,6 +1060,10 @@ function msText(value: number): string {
 
 function percentText(value: number): string {
   return `${formatNumber(value)}%`;
+}
+
+function sampleCountText(rawCount: number, filteredCount: number): string {
+  return `${filteredCount}/${rawCount} kept`;
 }
 
 function megabitsText(value: number): string {

@@ -60,8 +60,11 @@ The user homepage at `/` is focused on one speed-test workflow:
 - the running app version pill doubles as a hidden admin entry: click it five times in a row to open `/admin`
 - warning banners appear when the browser is a local self-test or concurrent test capacity is near/full
 - the main test panel groups the live Mbps readout, phase progress, current status, and start/retest action
+- the current status area shows the server-seen `Client IP` and whether it came directly from the request or from trusted proxy handling; the value is refreshed before each test starts
+- the current status area requires a simple `Wired` or `Wi-Fi` button choice before each test starts; the choice is saved with that run
+- the current status area offers fixed `Quick 20s` and `Full 30s` test modes; Quick is selected by default, and the selected duration is saved as `durationSeconds`
 - the current status area shows accumulated `Total Download` and `Total Upload` in megabits (`Mb`) for the current test only
-- after a completed test, a compact `HTML` / `PNG` IT report download row appears near the retest action without changing the main dashboard layout
+- after a completed test, a compact `HTML` / `PNG` / `Markdown` IT report download row appears near the retest action without changing the main dashboard layout
 - Download and Upload are shown as primary speed metrics inside the main panel
 - Idle Latency, Loaded Latency, Jitter, and HTTP Loss are shown as secondary quality metrics below the main row
 - the live readout and each metric card include process sparklines for the current test run
@@ -69,7 +72,7 @@ The user homepage at `/` is focused on one speed-test workflow:
 - hovering the enlarged trend chart shows the nearest sample number and value; the hover marker is a small filled point and the compact card sparklines remain line-only
 - desktop keeps the top row in two equal-width cards: the left card contains only the live readout, chart, and progress; the right card contains current status, accumulated transfer, the action button, and primary speed metrics
 - the desktop top row sizes to its content instead of stretching to fill leftover dashboard height, so the live readout card stays visually compact
-- Your Recent Results appears directly below the test panel as a compact browser-scoped history strip with hover/focus details for timestamp, download, and upload; the active result's download/upload bars brighten with subtle outlines while the tooltip is visible
+- Your Recent Results appears directly below the test panel as a compact browser-scoped history strip with hover/focus details for timestamp, selected link type, client IP, download, and upload; clicking or pressing a result opens a popup with the saved test record, including the server-seen client IP captured when that test was saved, and the active result's download/upload bars brighten with subtle outlines while the tooltip is visible
 
 The layout is responsive: desktop is tuned for one-screen operation at normal desktop heights, while tablet and mobile stack the same content and remain scrollable without changing the measurement flow.
 
@@ -96,13 +99,15 @@ ADMIN_SESSION_TTL_HOURS=8
 
 `MAX_TEST_BYTES` limits a single download or upload request. The browser loops requests for the configured test duration instead of asking for one giant body.
 
-Download and upload are sampled in 250 ms throughput windows after a short warmup. The primary speed value is the **trimmed mean**: throughput samples are sorted, samples outside the IQR fence (Q1 − 1.5×IQR, Q3 + 1.5×IQR) are dropped, and the arithmetic mean of the remaining samples is reported. P10 Low, P50 Typical, P75 Upper, and P90 High percentiles are still surfaced for reference, and the **coefficient of variation (CV = σ/mean, shown as a percentage)** is used as the stability indicator so it can be compared across very different link speeds. Download requests are 16 MB per chunk, streamed and sampled continuously. Upload requests are 256 KB per chunk so that more round-trip completions fit inside the test window and the upload sample count stays comparable to download.
+Download and upload are sampled in 250 ms throughput windows after a short warmup. The homepage uses fixed `Quick 20s` and `Full 30s` modes instead of the admin default duration; the admin/runtime default remains a fallback and compatibility setting. Before summary statistics are calculated, the first `ceil(sample_count × 3%)` post-warmup throughput samples are discarded, capped so at least one sample remains. The primary speed value is the **stable trimmed mean**: the remaining throughput samples are sorted, samples outside the IQR fence (Q1 − 1.5×IQR, Q3 + 1.5×IQR) are dropped, and the arithmetic mean of the retained samples is reported. P10 Low, P50 Typical, P75 Upper, and P90 High percentiles are calculated from the startup-trimmed samples before IQR filtering. Raw CV is calculated before IQR filtering to expose Wi-Fi-style variability; Stable CV is calculated after IQR filtering to describe the stable-speed estimate. Download requests are 16 MB per chunk, streamed and sampled continuously. Upload requests are 256 KB per chunk so that more round-trip completions fit inside the test window and the upload sample count stays comparable to download.
+
+The completion summary is stability-first. HTTP loss, Raw CV, P10/Mean ratio, IQR outlier rate, jitter, and loaded latency determine the main bottleneck before speed does; speed remains visible as its own tile and becomes the main limit only when it falls into the unusable speed tier. If a Wi-Fi run has poor stability or reliability, the summary recommends retrying on Wired to isolate the wireless segment. If a Wired run is still poor, it points IT toward the switch, uplink, or server path. A normal browser page cannot reliably detect true Ethernet vs Wi-Fi or Wi-Fi RSSI/SSID, so the selected link type is a required user label rather than an automatic hardware reading.
 
 The accumulated `Total Download` and `Total Upload` row uses the same warmup-adjusted effective transfer bytes as the throughput calculation, converted to decimal megabits. It is a current-test UI value only; it is not saved in Recent Results and does not change the server result schema.
 
 The browser speed-test work runs inside a module Web Worker. The main page keeps active-test sessions, heartbeats, result saving, and Recent Results management on the UI thread, then terminates the Worker after completion, Retest, error, or page unmount. This releases the test-time JavaScript heap, timers, upload payload buffers, sampler arrays, AbortController state, and stream-reader references without reloading the page. Browsers can still keep network-process memory for a short time, so this reduces the page's retained test memory rather than forcing the operating system to immediately reclaim all RAM.
 
-The completed-test IT report is generated only when the user clicks `HTML` or `PNG`. The report includes a `Test Charts` section with the current run's download, upload, idle latency, loaded latency, jitter, and HTTP loss graphs, then combines the saved result with current browser diagnostics and request context, including client IP, coarse IP, browser family, User-Agent, platform, language, timezone, screen/viewport size, device pixel ratio, CPU thread hint, device memory hint, and browser Network Information API hints when available. If `/api/report-context` is unavailable, the export still succeeds with missing fields marked as `Unavailable`.
+The completed-test IT report is generated only when the user clicks `HTML`, `PNG`, or `Markdown`. All three formats are built from the same report snapshot and start with a network-quality judgment for human and AI review: verdict, primary limit, selected link type, core speed/latency/loss values, client IP, and context status. HTML and PNG keep a clean modern visual layout with the judgment summary before the `Test Charts` section. Markdown downloads a `.md` file with an AI-readable YAML-style summary followed by human-readable tables. Reports combine the saved result with current browser diagnostics and request context, including selected link type, client IP, coarse IP, browser family, User-Agent, platform, language, timezone, screen/viewport size, device pixel ratio, CPU thread hint, device memory hint, and browser Network Information API hints when available. Its speed-result rows show Stable Mean, P10/P50/P75/P90, Raw CV, Stable CV, and samples kept from the saved result. If `/api/report-context` is unavailable, the export still succeeds with missing fields marked as `Unavailable`.
 
 Existing `.env` files or SQLite runtime settings keep their current test duration until you change them directly or through the admin console.
 
@@ -163,20 +168,24 @@ Active test counts are stored in memory and expire automatically when a browser 
 
 ## Data Privacy
 
-SQLite stores only recent anonymous measurement rows. It does not store raw IP addresses, accounts, cookies, tokens, full user-agent strings, raw browser identifiers, or private user content.
+SQLite stores recent anonymous measurement rows plus the raw server-seen client IP captured for each saved test result. It does not store accounts, cookies, tokens, full user-agent strings, raw browser identifiers, or private user content.
+
+The homepage displays the current server-seen client IP from the no-store `/api/report-context` response so users can confirm which address the test server sees before running. When a test result is saved, the backend stores the same class of server-seen `request.ip` value with that result so Recent Results can show the IP used for that specific test. This is not a browser-discovered local network-interface address or public egress IP lookup.
 
 Admin event logs store only action names and small metadata such as changed setting keys or changed row counts. They do not store the admin password, raw IP address, cookies, tokens, or full user-agent strings.
 
-Downloaded IT reports can include raw client IP and full browser User-Agent because the user explicitly generates the file for IT evaluation. Those report-only details are not written to SQLite by the export flow, and `/api/report-context` does not return cookies, tokens, authorization headers, or full request headers.
+Downloaded IT reports can include raw client IP and full browser User-Agent because the user explicitly generates the file for IT evaluation. The full User-Agent remains report-only; the saved test result already contains the server-seen client IP used by Recent Results. `/api/report-context` does not return cookies, tokens, authorization headers, or full request headers.
 
 Saved fields include:
 
 - timestamp
 - server name
-- download/upload trimmed-mean Mbps plus P10/P50/P75/P90 percentiles, coefficient of variation (CV %), and sample counts (raw and post-IQR-filter)
+- download/upload stable trimmed-mean Mbps plus P10/P50/P75/P90 percentiles, Raw CV, Stable CV, and sample counts after startup trim and post-IQR-filter
 - idle and loaded latency
 - jitter and HTTP loss
 - duration and parallel connection count
+- selected network link type (`Wired`, `Wi-Fi`, or legacy `Unknown`)
+- server-seen client IP for that saved test result; rows saved before this field existed show `Not recorded` in the UI
 - browser family
 - hashed client id derived from a coarse network address and browser family
 - hashed browser/device id used only to keep Recent Results scoped to the same browser
@@ -203,7 +212,7 @@ curl http://127.0.0.1:8080/api/health
 
 Open `http://127.0.0.1:8080` to verify the page loads. Because local self-tests are blocked by default, run a valid speed test from another intranet device unless `ALLOW_LOCAL_SELF_TEST=true` is temporarily enabled for maintenance.
 
-For UI changes, also check the homepage at desktop, tablet, and mobile widths to confirm the test panel, metric groups, and Recent Results chart do not overlap or overflow. For desktop layout work, verify `1089x964`, `1280x900`, and `1710x1021`: the full-page height should match the viewport height, the two top-row cards should have equal width, and the live readout card should not be vertically stretched by empty space. Mobile viewports may remain vertically scrollable as long as all content is reachable. When checking Recent Results, confirm hover and keyboard focus both show the tooltip and brighten the active download/upload bars.
+For UI changes, also check the homepage at desktop, tablet, and mobile widths to confirm the test panel, connection IP strip, link-type buttons, Quick/Full duration selector, metric groups, and Recent Results chart do not overlap or overflow. For desktop layout work, verify `1089x964`, `1280x900`, and `1710x1021`: the full-page height should match the viewport height, the two top-row cards should have equal width, and the live readout card should not be vertically stretched by empty space. Mobile viewports may remain vertically scrollable as long as all content is reachable. Confirm the current status area shows `Client IP` and `Source` from `/api/report-context`; if that endpoint is unavailable, the homepage should show `Connection unavailable` without blocking the speed-test controls. Confirm `Quick 20s` is selected by default and `Full 30s` can be selected before starting a run. When checking Recent Results, confirm hover and keyboard focus both show the tooltip with selected link type and saved client IP, confirm the active download/upload bars brighten, and confirm click or keyboard activation opens the saved-record popup with a `Client IP` tile. Legacy rows without a stored IP should show `Not recorded`.
 
 When checking metric detail interactions, confirm all six metric cards open the detail dialog, the main live readout does not open a dialog, hover over the enlarged chart shows the nearest sample value, and Esc, backdrop click, and the close button all dismiss the dialog.
 
@@ -211,7 +220,13 @@ When checking the hidden admin entry, confirm the top-right version pill remains
 
 When checking the site icon, confirm the browser tab loads the generated pixel-style `favicon.png` without a missing-icon fallback, and that the area outside the icon frame is transparent.
 
-When checking IT report export, complete a test and confirm the compact `HTML` and `PNG` buttons appear only after completion. Download both formats, verify the HTML opens as a self-contained report with the `Test Charts` SVG section, verify the PNG text and chart section are readable, and confirm the homepage layout remains unchanged at the desktop viewport checks above.
+When checking IT report export, complete a test after selecting `Wired` or `Wi-Fi` and confirm the compact `HTML`, `PNG`, and `Markdown` buttons appear only after completion. Download all three formats, verify the HTML opens as a self-contained report with the selected link type and `Test Charts` SVG section, verify the PNG text and chart section are readable, verify the Markdown contains the AI-readable summary plus human-readable tables, and confirm the homepage layout remains unchanged at the desktop viewport checks above.
+
+For analysis-data debugging, use `docs/analysis-data-debugging.md` to reconcile the homepage, Recent Results API, SQLite row, and downloaded report for the same run. The focused regression command is:
+
+```bash
+npm test -- test/metrics.test.ts test/speed-test-core.test.ts test/result-summary.test.ts test/report-export.test.ts test/api.test.ts
+```
 
 ## Non-Container Deployment
 

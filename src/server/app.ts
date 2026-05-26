@@ -192,6 +192,7 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
     const saved = repository.save(parsed.data, {
       serverName: settings.testServerName,
       isLocalClient: detectLocalClient(request.ip).isLocalClient,
+      clientIp: request.ip,
       browserClientHash: browserClientHash(request.headers[BROWSER_CLIENT_ID_HEADER.toLowerCase()]),
       ...identity
     });

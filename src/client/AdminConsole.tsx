@@ -339,7 +339,7 @@ export function AdminConsole() {
 
               <div className="admin-field-grid">
                 <NumberField
-                  label="Test duration"
+                  label="Fallback duration"
                   suffix="seconds"
                   value={draft.defaultTestDurationSeconds}
                   min={3}

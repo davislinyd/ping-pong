@@ -1,48 +1,59 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-14T15:43:24+08:00",
+  "last_updated": "2026-05-26T10:36:04+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
-  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, multi-stat throughput reporting, current-test transfer display, Web Worker execution, compact IT diagnostic report export, a desktop one-screen dashboard, Admin Console controls, local production health, and OctoPulse visibility.",
-  "latest_summary": "Completed tests now expose compact HTML and PNG IT diagnostic report downloads near the existing retest action without moving the main dashboard cards or Recent Results. Reports include a Test Charts section with the current run's download, upload, idle latency, loaded latency, jitter, and HTTP loss graphs before the numeric diagnostic sections. Reports also combine the saved result with request context from the no-store GET /api/report-context endpoint and browser-side diagnostics such as User-Agent, platform, timezone, viewport, screen, CPU thread hint, device memory hint, and Network Information API hints when available. Raw client IP and full User-Agent appear only in user-downloaded report files and are not stored in SQLite by this export flow. The existing speed-test flow, active-test heartbeat, result saving, personal history deletion, Admin Console, metric detail modal, generated favicon, and layout structure are preserved.",
-  "next_action": "Configure the intended GitLab remote before push or release workflows. If IT needs Wi-Fi SSID, MAC address, hostname, route table, CPU model, or similar machine-level data, plan a separate native helper or browser extension because the browser-only page cannot collect those fields.",
+  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, stability-first completion summaries, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible project documentation.",
+  "latest_summary": "Throughput statistics now use proportional startup trimming, discarding ceil(3%) of post-warmup samples while keeping at least one sample. Download and Upload continue to show the IQR-filtered stable mean; detail/report surfaces Stable Mean, P10, P50, P90, Raw CV, Stable CV, and samples kept. Stability summary now takes the worst grade from Raw CV, P10/Mean ratio, IQR outlier rate, and jitter. ThroughputStats, /api/results validation, SQLite persistence, migrations, reports, and tests support rawCvPercent with legacy fallback to cvPercent. The homepage now has fixed Quick 20s and Full 30s duration buttons, Quick is default, and the Admin Console duration label is clarified as a fallback duration.",
+  "next_action": "Review and commit the speed-test statistics optimization when ready. Separately decide whether the pre-existing .gitignore, AGENTS.md, deleted Ping-Pong project docx, untracked HTML specification, and other unrelated dirty files are intentional.",
   "git": {
     "branch": "main",
     "dirty": true,
-    "remote_tracking": null,
-    "commit": "4180975"
+    "remote_tracking": "origin/main",
+    "commit": "4baba95"
   },
   "verification": {
     "status": "passed",
     "last_commands": [
+      "git rev-parse --is-inside-work-tree",
       "git status --short --branch",
-      "git branch -vv",
       "git remote -v",
+      "test -f .ai/status.json && sed -n '1,240p' .ai/status.json",
       "npm run typecheck",
+      "npm test -- test/api.test.ts",
       "npm test",
       "npm run build",
-      "lsof -nP -iTCP:8080 -sTCP:LISTEN",
-      "nohup npm start > /tmp/ping-pong-npm-start.log 2>&1 &",
-      "curl -sS http://127.0.0.1:8080/api/health",
-      "curl -sS -D - http://127.0.0.1:8080/api/report-context -H 'User-Agent: Mozilla/5.0 Chrome/120.0'",
-      "Playwright CLI completed a local self-test and saved /tmp/ping-pong-report-chart.html and /tmp/ping-pong-report-chart.png",
-      "file /tmp/ping-pong-report-chart.html /tmp/ping-pong-report-chart.png",
-      "rg -n 'Test Charts|chart-svg|Download test chart|Upload test chart|chart-line' /tmp/ping-pong-report-chart.html",
-      "sips -g pixelWidth -g pixelHeight /tmp/ping-pong-report-chart.png",
-      "Playwright CLI viewport checks at 1089x964, 1280x900, 1710x1021, 768x1024, and 390x844",
       "git diff --check",
-      "python /Users/lindav/git/OctoPulse/tools/validate_status.py /Users/lindav/git/Ping\\ Pong/.ai/status.json",
-      "PYTHONDONTWRITEBYTECODE=1 python tools/scan_projects.py"
+      "rg -n '^PORT=' -g '.env*'",
+      "launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest",
+      "lsof -nP -iTCP:8200 -sTCP:LISTEN",
+      "curl -fsS http://127.0.0.1:8200/api/health",
+      "curl -fsS http://127.0.0.1:8200/api/report-context",
+      "curl -fsS http://127.0.0.1:8200/",
+      "curl -fsS 'http://127.0.0.1:8200/api/results/recent?limit=5&includeLocal=true'",
+      "In-app Browser verification checked Quick 20s default, Full 30s selection, Wired selection enabling Start, no console warnings/errors, and viewport layout at 1089x964, 1280x900, 1710x1021, 390x844, and 768x1024",
+      "node -e \"JSON.parse(require('node:fs').readFileSync('.ai/status.json','utf8')); console.log('status json ok')\"",
+      "python /Users/lindav/git/OctoPulse/tools/validate_status.py /Users/lindav/git/Ping\\ Pong/.ai/status.json"
     ],
-    "last_verified_at": "2026-05-14T15:43:24+08:00",
-    "notes": "Production service was restarted after build and now listens on port 8080 as node dist/server/main.js PID 40029 under npm start PID 39901. /api/report-context returns no-store context without raw request header dumps. Playwright CLI verified the generated HTML and PNG reports include the Test Charts section; the PNG is 1080 x 3853. Desktop measurements confirmed page height equals viewport height and equal top-row card widths at the required sizes; tablet/mobile checks found no horizontal overflow."
+    "last_verified_at": "2026-05-26T10:36:04+08:00",
+    "notes": "All automated checks passed after the speed-test statistics optimization: typecheck, full Vitest suite (8 files, 76 tests), production build, and git diff whitespace check. Tests cover 3% startup discard counts for 50/76/116 samples, proportional startup trimming, IQR mean behavior, Raw CV vs Stable CV on Wi-Fi-like data, stability downgrades from Raw CV, P10/Mean ratio, and IQR outlier rate, rawCvPercent API/SQLite save-read, and legacy migration fallback from cvPercent. The LaunchAgent-backed service was restarted on the configured .env port 8200 after the final build. Health, report-context, homepage, and recent-results API checks returned successfully. In-app Browser verification found Quick 20s selected by default, Full 30s selectable, Wired selection enabling Start, no console errors or warnings, no visible horizontal overflow, equal desktop first-row card widths, and desktop scroll height matching viewport height at 1089x964, 1280x900, and 1710x1021. Mobile 390x844 and tablet 768x1024 remained scrollable with all content reachable; the 390px layout was adjusted so Download/Upload diagnostic stats are readable in single-column primary cards."
   },
   "attention": [
-    "Git repo exists on main with no configured remote or upstream, so delivery is local-only until a remote is added.",
-    "Local self-tests still show a warning because they are not real intranet measurements.",
-    "Report export is intentionally browser-only and does not collect machine data unavailable to normal webpages, such as Wi-Fi SSID, MAC address, hostname, route table, or CPU model."
+    "Working tree remains dirty beyond .ai/status.json. It includes the speed-test statistics optimization plus pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong-\u5c08\u6848\u8aaa\u660e\u66f8.docx, untracked Ping-Pong-Project-Specification.html, docs/analysis-data-debugging.md, and other existing modified files that still need user decision before commit.",
+    "The running service uses .env PORT=8200, not the README default 8080.",
+    "Browser verification used localhost with local self-test enabled by runtime settings; a non-local intranet device test is still required to evaluate real network performance."
+  ],
+  "recent_changes": [
+    {
+      "id": "2026-05-26T10:36:04+08:00-code-4baba95",
+      "at": "2026-05-26T10:36:04+08:00",
+      "kind": "code",
+      "summary": "Implemented Quick 20s/Full 30s homepage modes, proportional throughput trimming, raw CV diagnostics, stricter stability grading, rawCvPercent API/SQLite support, report/README updates, and responsive QA fix.",
+      "commit": "4baba95",
+      "verification": "npm run typecheck; npm test; npm run build; git diff --check; launchctl restart; curl health/report/home/recent; in-app browser QA at 1089x964, 1280x900, 1710x1021, 390x844, 768x1024"
+    }
   ]
 }

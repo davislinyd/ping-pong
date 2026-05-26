@@ -1,7 +1,9 @@
 export const CAT_SPEED_STAGES = ["idle", "walk", "jog", "run", "sprint"] as const;
+export const NETWORK_LINK_TYPES = ["wired", "wifi", "unknown"] as const;
 export const BROWSER_CLIENT_ID_HEADER = "X-Ping-Pong-Browser-Id";
 
 export type CatSpeedStage = (typeof CAT_SPEED_STAGES)[number];
+export type NetworkLinkType = (typeof NETWORK_LINK_TYPES)[number];
 
 export type CatSpeedRange = {
   minMbps: number;
@@ -109,6 +111,7 @@ export type ResultPayload = {
   httpLossPercent: number;
   durationSeconds: number;
   parallelConnections: number;
+  networkLinkType: NetworkLinkType;
 };
 
 export type ThroughputStats = {
@@ -117,6 +120,7 @@ export type ThroughputStats = {
   p50Mbps: number;
   p75Mbps: number;
   p90Mbps: number;
+  rawCvPercent: number;
   cvPercent: number;
   sampleCount: number;
   filteredSampleCount: number;
@@ -128,6 +132,7 @@ export type SavedResult = ResultPayload & {
   serverName: string;
   browserFamily: string;
   clientId: string;
+  clientIp: string | null;
   isLocalClient: boolean;
 };
 
@@ -153,6 +158,12 @@ export type ClientSafety = {
 
 export function cloneCatSpeedRanges(ranges: CatSpeedRanges): CatSpeedRanges {
   return Object.fromEntries(CAT_SPEED_STAGES.map((stage) => [stage, { ...ranges[stage] }])) as CatSpeedRanges;
+}
+
+export function networkLinkTypeLabel(type: NetworkLinkType): string {
+  if (type === "wired") return "Wired";
+  if (type === "wifi") return "Wi-Fi";
+  return "Unknown";
 }
 
 export function normalizeCatSpeedRanges(value: unknown): CatSpeedRanges {

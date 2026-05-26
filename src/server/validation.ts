@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { catSpeedRangeValidationMessage } from "../shared/contracts.js";
+import { NETWORK_LINK_TYPES, catSpeedRangeValidationMessage } from "../shared/contracts.js";
 import { MAX_ALLOWED_TEST_BYTES } from "./config.js";
 
 const throughputStatsSchema = z
@@ -10,11 +10,16 @@ const throughputStatsSchema = z
     p50Mbps: z.number().finite().min(0).max(1_000_000),
     p75Mbps: z.number().finite().min(0).max(1_000_000),
     p90Mbps: z.number().finite().min(0).max(1_000_000),
+    rawCvPercent: z.number().finite().min(0).max(1_000_000).optional(),
     cvPercent: z.number().finite().min(0).max(1_000_000),
     sampleCount: z.number().int().min(0).max(100_000),
     filteredSampleCount: z.number().int().min(0).max(100_000)
   })
-  .strict();
+  .strict()
+  .transform((stats) => ({
+    ...stats,
+    rawCvPercent: stats.rawCvPercent ?? stats.cvPercent
+  }));
 
 export const resultPayloadSchema = z
   .object({
@@ -28,7 +33,8 @@ export const resultPayloadSchema = z
     jitterMs: z.number().finite().min(0).max(600_000),
     httpLossPercent: z.number().finite().min(0).max(100),
     durationSeconds: z.number().int().min(1).max(3600),
-    parallelConnections: z.number().int().min(1).max(64)
+    parallelConnections: z.number().int().min(1).max(64),
+    networkLinkType: z.enum(NETWORK_LINK_TYPES).default("unknown")
   })
   .transform((payload) => {
     const downloadStats = payload.downloadStats ?? legacyThroughputStats(payload.downloadMbps);
@@ -128,6 +134,7 @@ function legacyThroughputStats(mbps: number) {
     p50Mbps: mbps,
     p75Mbps: mbps,
     p90Mbps: mbps,
+    rawCvPercent: 0,
     cvPercent: 0,
     sampleCount: 0,
     filteredSampleCount: 0

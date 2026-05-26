@@ -105,6 +105,7 @@ describe("runSpeedTest", () => {
 
     expect(result.durationSeconds).toBe(testConfig.defaultTestDurationSeconds);
     expect(result.parallelConnections).toBe(testConfig.parallelConnections);
+    expect(result.networkLinkType).toBe("unknown");
     expect(result.downloadMbps).toBeGreaterThanOrEqual(0);
     expect(result.uploadMbps).toBeGreaterThanOrEqual(0);
     expect(result.idleLatencyMs).toBeGreaterThanOrEqual(0);

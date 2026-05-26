@@ -147,10 +147,21 @@ function baseResult(patch: Partial<ResultPayload> = {}): ResultPayload {
     httpLossPercent: 0,
     durationSeconds: 8,
     parallelConnections: 4,
+    networkLinkType: "unknown",
     ...patch
   };
 }
 
 function stats(p10Mbps: number, p50Mbps: number, p90Mbps: number, sampleCount: number): ThroughputStats {
-  return { p10Mbps, p50Mbps, p90Mbps, sampleCount };
+  return {
+    meanMbps: p50Mbps,
+    p10Mbps,
+    p50Mbps,
+    p75Mbps: (p50Mbps + p90Mbps) / 2,
+    p90Mbps,
+    rawCvPercent: 5,
+    cvPercent: 5,
+    sampleCount,
+    filteredSampleCount: sampleCount
+  };
 }

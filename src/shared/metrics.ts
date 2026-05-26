@@ -30,8 +30,8 @@ export function throughputStatsFromSamples(samples: ThroughputSample[], fallback
     .map((sample) => bytesToMbps(sample.bytes, sample.elapsedMs))
     .filter((value) => Number.isFinite(value));
 
-  if (mbpsSamples.length > 1) {
-    const stableSamples = mbpsSamples.slice(1);
+  if (mbpsSamples.length > 0) {
+    const stableSamples = mbpsSamples.slice(startupDiscardCount(mbpsSamples.length));
     return statsFromMbpsSamples(stableSamples);
   }
 
@@ -42,10 +42,16 @@ export function throughputStatsFromSamples(samples: ThroughputSample[], fallback
     p50Mbps: fallbackMbps,
     p75Mbps: fallbackMbps,
     p90Mbps: fallbackMbps,
+    rawCvPercent: 0,
     cvPercent: 0,
     sampleCount: mbpsSamples.length,
     filteredSampleCount: mbpsSamples.length
   };
+}
+
+export function startupDiscardCount(sampleCount: number): number {
+  if (sampleCount <= 1) return 0;
+  return Math.min(sampleCount - 1, Math.max(1, Math.ceil(sampleCount * 0.03)));
 }
 
 export function percentile(values: number[], targetPercentile: number): number {
@@ -103,6 +109,7 @@ function statsFromMbpsSamples(samples: number[]): ThroughputStats {
     p50Mbps: percentile(samples, 50),
     p75Mbps: percentile(samples, 75),
     p90Mbps: percentile(samples, 90),
+    rawCvPercent: coefficientOfVariation(samples),
     cvPercent: coefficientOfVariation(meanSource),
     sampleCount: samples.length,
     filteredSampleCount: filtered.length
