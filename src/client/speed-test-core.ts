@@ -1,4 +1,4 @@
-import type { ResultPayload, RuntimeConfigResponse, ThroughputStats } from "../shared/contracts";
+import type { ResultPayload, RuntimeConfigResponse, TestProfile, ThroughputStats } from "../shared/contracts";
 import { bytesToMegabits, bytesToMbps, filterIqrOutliers, jitter, lossPercent, median, roundTo, throughputStatsFromSamples, type ThroughputSample } from "../shared/metrics";
 import { API_BASE } from "./api-base";
 
@@ -55,6 +55,8 @@ export async function runSpeedTest(
   const series = createEmptyMetricSeries();
   let latencySent = 0;
   let latencyFailed = 0;
+  const effectiveParallelConnections = effectiveParallelConnectionCount(config);
+  const testProfile = testProfileForConfig(config);
 
   function recordLatencySample(sample: number | null, target: "idle" | "loaded") {
     latencySent += 1;
@@ -166,8 +168,9 @@ export async function runSpeedTest(
     jitterMs,
     httpLossPercent: lossPercent(totalSent, totalFailed),
     durationSeconds: config.defaultTestDurationSeconds,
-    parallelConnections: config.parallelConnections,
-    networkLinkType: "unknown"
+    parallelConnections: effectiveParallelConnections,
+    networkLinkType: "unknown",
+    testProfile
   };
 
   onProgress({
@@ -246,7 +249,8 @@ async function measureDownload(
   const startedAt = performance.now();
   const warmupUntil = startedAt + Math.min(WARMUP_MS, durationMs / 3);
   const stopAt = startedAt + durationMs;
-  const chunkBytes = Math.min(config.maxTestBytes, DOWNLOAD_CHUNK_BYTES);
+  const chunkBytes = Math.min(config.maxTestBytes, downloadChunkBytes(config));
+  const pacer = createTransferPacer(config);
   let measurementBytes = 0;
   const throughputSamples: ThroughputSample[] = [];
   const sampler = createThroughputSampler(warmupUntil, throughputSamples, onMbps, (now) => phaseProgress(startedAt, stopAt, now));
@@ -254,7 +258,7 @@ async function measureDownload(
 
   const loadedLatencyPromise = collectLoadedLatency(stopAt, signal, onLoadedLatencySample);
 
-  const workers = Array.from({ length: config.parallelConnections }, async () => {
+  const workers = Array.from({ length: effectiveParallelConnectionCount(config) }, async () => {
     while (performance.now() < stopAt && !signal.aborted) {
       const response = await fetch(`${API_BASE}/api/download?bytes=${chunkBytes}&nonce=${nonce()}`, {
         cache: "no-store",
@@ -276,6 +280,7 @@ async function measureDownload(
             onMegabits?.(bytesToMegabits(measurementBytes));
           }
           progress.report(now);
+          await pacer?.pace(read.value.byteLength, signal);
         }
       } finally {
         await reader.cancel().catch(() => undefined);
@@ -314,7 +319,8 @@ async function measureUpload(
   const startedAt = performance.now();
   const warmupUntil = startedAt + Math.min(WARMUP_MS, durationMs / 3);
   const stopAt = startedAt + durationMs;
-  const payloadBytes = Math.min(config.maxTestBytes, UPLOAD_CHUNK_BYTES);
+  const payloadBytes = Math.min(config.maxTestBytes, uploadChunkBytes(config));
+  const pacer = createTransferPacer(config);
   let measurementBytes = 0;
   const throughputSamples: ThroughputSample[] = [];
   const sampler = createThroughputSampler(warmupUntil, throughputSamples, onMbps, (now) => phaseProgress(startedAt, stopAt, now));
@@ -322,7 +328,7 @@ async function measureUpload(
 
   const loadedLatencyPromise = collectLoadedLatency(stopAt, signal, onLoadedLatencySample);
 
-  const workers = Array.from({ length: config.parallelConnections }, async () => {
+  const workers = Array.from({ length: effectiveParallelConnectionCount(config) }, async () => {
     const uploadBody = new Uint8Array(payloadBytes);
 
     while (performance.now() < stopAt && !signal.aborted) {
@@ -357,6 +363,7 @@ async function measureUpload(
         onMegabits?.(bytesToMegabits(measurementBytes));
       }
       progress.report(now);
+      await pacer?.pace(payloadBytes, signal);
     }
   });
 
@@ -417,6 +424,40 @@ function createProgressReporter(startedAt: number, stopAt: number, onPhaseProgre
       if (!onPhaseProgress || now - lastProgressAt < 160) return;
       onPhaseProgress(phaseProgress(startedAt, stopAt, now));
       lastProgressAt = now;
+    }
+  };
+}
+
+function testProfileForConfig(config: RuntimeConfigResponse): TestProfile {
+  return config.localThrottle.active ? "local-throttled" : "standard";
+}
+
+function effectiveParallelConnectionCount(config: RuntimeConfigResponse): number {
+  return config.localThrottle.active ? config.localThrottle.parallelConnections : config.parallelConnections;
+}
+
+function downloadChunkBytes(config: RuntimeConfigResponse): number {
+  return config.localThrottle.active ? config.localThrottle.downloadChunkBytes : DOWNLOAD_CHUNK_BYTES;
+}
+
+function uploadChunkBytes(config: RuntimeConfigResponse): number {
+  return config.localThrottle.active ? config.localThrottle.uploadChunkBytes : UPLOAD_CHUNK_BYTES;
+}
+
+function createTransferPacer(config: RuntimeConfigResponse): { pace: (bytes: number, signal: AbortSignal) => Promise<void> } | null {
+  if (!config.localThrottle.active) return null;
+
+  const bytesPerMs = (config.localThrottle.maxMbps * 1_000_000) / 8 / 1000;
+  if (!Number.isFinite(bytesPerMs) || bytesPerMs <= 0) return null;
+
+  let nextAt = performance.now();
+  return {
+    async pace(bytes: number, signal: AbortSignal) {
+      nextAt = Math.max(nextAt, performance.now()) + bytes / bytesPerMs;
+      const waitMs = nextAt - performance.now();
+      if (waitMs > 1) {
+        await delay(waitMs, signal);
+      }
     }
   };
 }

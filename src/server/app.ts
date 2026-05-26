@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ZodError } from "zod";
 
-import { BROWSER_CLIENT_ID_HEADER, type EditableRuntimeSettings } from "../shared/contracts.js";
+import { BROWSER_CLIENT_ID_HEADER, DEFAULT_LOCAL_THROTTLE, type ClientSafety, type EditableRuntimeSettings } from "../shared/contracts.js";
 import { AdminSessionManager } from "./admin-auth.js";
 import { MAX_ALLOWED_TEST_BYTES, type RuntimeConfig } from "./config.js";
 import { ActiveTestTracker } from "./active-tests.js";
@@ -72,13 +72,15 @@ export async function createApp(config: RuntimeConfig): Promise<FastifyInstance>
 
   app.get("/api/config", async (request) => {
     const settings = runtimeSettings.current();
+    const clientSafety = clientSafetyForRequest(settings, request.ip);
     return {
       serverName: settings.testServerName,
       defaultTestDurationSeconds: settings.defaultTestDurationSeconds,
       parallelConnections: settings.parallelConnections,
       maxTestBytes: settings.maxTestBytes,
       catSpeedRanges: settings.catSpeedRanges,
-      clientSafety: clientSafetyForRequest(settings, request.ip)
+      clientSafety,
+      localThrottle: localThrottleForClientSafety(clientSafety)
     };
   });
 
@@ -363,6 +365,13 @@ function clientSafetyForRequest(config: Pick<EditableRuntimeSettings, "allowLoca
       safety.isLocalClient && !canRunTest
         ? `${safety.message} Testing is disabled on this machine.`
         : safety.message
+  };
+}
+
+function localThrottleForClientSafety(clientSafety: ClientSafety) {
+  return {
+    ...DEFAULT_LOCAL_THROTTLE,
+    active: clientSafety.isLocalClient && clientSafety.canRunTest
   };
 }
 

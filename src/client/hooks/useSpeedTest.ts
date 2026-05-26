@@ -44,7 +44,8 @@ const emptyResult: ResultPayload = {
   httpLossPercent: 0,
   durationSeconds: 0,
   parallelConnections: 0,
-  networkLinkType: "unknown"
+  networkLinkType: "unknown",
+  testProfile: "standard"
 };
 
 export function useSpeedTest(): SpeedTestHook {

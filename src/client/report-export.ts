@@ -288,6 +288,7 @@ export function reportSections(snapshot: ReportSnapshot): ReportSection[] {
         { label: "Completed at", value: timestampText(result.createdAt) },
         { label: "Duration", value: `${result.durationSeconds} seconds` },
         { label: "Parallel connections", value: String(result.parallelConnections) },
+        { label: "Test profile", value: testProfileLabel(result.testProfile) },
         { label: "Total download", value: megabitsText(snapshot.transferMegabits.download) },
         { label: "Total upload", value: megabitsText(snapshot.transferMegabits.upload) }
       ]
@@ -376,6 +377,7 @@ export function renderReportMarkdown(snapshot: ReportSnapshot): string {
     { label: "primaryLimit", value: snapshot.summary.primaryLimit },
     { label: "limitingSide", value: snapshot.summary.limitingSide },
     { label: "linkType", value: networkLinkTypeLabel(snapshot.savedResult.networkLinkType) },
+    { label: "testProfile", value: testProfileLabel(snapshot.savedResult.testProfile) },
     { label: "downloadMbps", value: mbpsText(snapshot.savedResult.downloadMbps) },
     { label: "uploadMbps", value: mbpsText(snapshot.savedResult.uploadMbps) },
     { label: "downloadRawCv", value: percentText(snapshot.savedResult.downloadStats.rawCvPercent) },
@@ -607,6 +609,7 @@ function reportHighlights(snapshot: ReportSnapshot): ReportRow[] {
     { label: "Verdict", value: snapshot.summary.title },
     { label: "Primary limit", value: snapshot.summary.primaryLimit },
     { label: "Selected link", value: networkLinkTypeLabel(result.networkLinkType) },
+    { label: "Test profile", value: testProfileLabel(result.testProfile) },
     { label: "Download", value: mbpsText(result.downloadMbps) },
     { label: "Upload", value: mbpsText(result.uploadMbps) },
     { label: "Worst latency", value: msText(Math.max(result.downloadLoadedLatencyMs, result.uploadLoadedLatencyMs)) },
@@ -632,6 +635,9 @@ function qualityJudgmentLines(snapshot: ReportSnapshot): string[] {
   }
 
   lines.push(localSelfTest ? "Local self-test risk: yes; speed values are functional checks, not real intranet measurements." : "Local self-test risk: no.");
+  if (result.testProfile === "local-throttled") {
+    lines.push("Local throttled profile: yes; traffic was capped for maintenance stability and does not represent full intranet throughput.");
+  }
   return lines;
 }
 
@@ -1064,6 +1070,10 @@ function percentText(value: number): string {
 
 function sampleCountText(rawCount: number, filteredCount: number): string {
   return `${filteredCount}/${rawCount} kept`;
+}
+
+function testProfileLabel(profile: SavedResult["testProfile"]): string {
+  return profile === "local-throttled" ? "Local throttled" : "Standard";
 }
 
 function megabitsText(value: number): string {

@@ -74,13 +74,14 @@ export class ResultsRepository {
         duration_seconds,
         parallel_connections,
         network_link_type,
+        test_profile,
         browser_family,
         client_id,
         client_ip,
         browser_client_hash,
         is_local_client
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = statement.run(
@@ -114,6 +115,7 @@ export class ResultsRepository {
       payload.durationSeconds,
       payload.parallelConnections,
       payload.networkLinkType,
+      payload.testProfile,
       context.browserFamily,
       context.clientId,
       context.clientIp,
@@ -173,6 +175,7 @@ export class ResultsRepository {
           duration_seconds AS durationSeconds,
           parallel_connections AS parallelConnections,
           network_link_type AS networkLinkType,
+          test_profile AS testProfile,
           browser_family AS browserFamily,
           client_id AS clientId,
           client_ip AS clientIp,
@@ -346,6 +349,7 @@ export class ResultsRepository {
         duration_seconds INTEGER NOT NULL,
         parallel_connections INTEGER NOT NULL,
         network_link_type TEXT NOT NULL DEFAULT 'unknown',
+        test_profile TEXT NOT NULL DEFAULT 'standard',
         browser_family TEXT NOT NULL,
         client_id TEXT NOT NULL,
         client_ip TEXT,
@@ -417,6 +421,7 @@ export class ResultsRepository {
     const addedFilteredCount = this.addResultColumn(columns, "download_filtered_sample_count", "download_filtered_sample_count INTEGER NOT NULL DEFAULT 0");
     const addedUpFilteredCount = this.addResultColumn(columns, "upload_filtered_sample_count", "upload_filtered_sample_count INTEGER NOT NULL DEFAULT 0");
     this.addResultColumn(columns, "network_link_type", "network_link_type TEXT NOT NULL DEFAULT 'unknown'");
+    this.addResultColumn(columns, "test_profile", "test_profile TEXT NOT NULL DEFAULT 'standard'");
 
     if (addedMean || addedP75 || addedCv || addedUpMean || addedUpP75 || addedUpCv) {
       this.db.exec(`
@@ -527,7 +532,8 @@ function rowToSavedResult(row: unknown): SavedResult {
     httpLossPercent: result.httpLossPercent,
     durationSeconds: result.durationSeconds,
     parallelConnections: result.parallelConnections,
-    networkLinkType: result.networkLinkType
+    networkLinkType: result.networkLinkType,
+    testProfile: result.testProfile
   };
 }
 

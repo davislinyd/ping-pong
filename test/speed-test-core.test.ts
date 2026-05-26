@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_CAT_SPEED_RANGES, type RuntimeConfigResponse } from "../src/shared/contracts";
+import { DEFAULT_CAT_SPEED_RANGES, DEFAULT_LOCAL_THROTTLE, type RuntimeConfigResponse } from "../src/shared/contracts";
 import { createEmptyMetricSeries, runSpeedTest, type TestPhase } from "../src/client/speed-test-core";
 
 const testConfig: RuntimeConfigResponse = {
@@ -9,7 +9,8 @@ const testConfig: RuntimeConfigResponse = {
   parallelConnections: 1,
   maxTestBytes: 67_108_864,
   catSpeedRanges: DEFAULT_CAT_SPEED_RANGES,
-  clientSafety: { isLocalClient: false, canRunTest: true, reason: null, message: null }
+  clientSafety: { isLocalClient: false, canRunTest: true, reason: null, message: null },
+  localThrottle: DEFAULT_LOCAL_THROTTLE
 };
 
 describe("createEmptyMetricSeries", () => {
@@ -106,6 +107,7 @@ describe("runSpeedTest", () => {
     expect(result.durationSeconds).toBe(testConfig.defaultTestDurationSeconds);
     expect(result.parallelConnections).toBe(testConfig.parallelConnections);
     expect(result.networkLinkType).toBe("unknown");
+    expect(result.testProfile).toBe("standard");
     expect(result.downloadMbps).toBeGreaterThanOrEqual(0);
     expect(result.uploadMbps).toBeGreaterThanOrEqual(0);
     expect(result.idleLatencyMs).toBeGreaterThanOrEqual(0);
@@ -138,5 +140,75 @@ describe("runSpeedTest", () => {
 
     expect(sawDownloadMegabits).toBe(true);
     expect(sawUploadMegabits).toBe(true);
+  }, 10_000);
+
+  it("uses standard connection and payload settings when local throttle is inactive", async () => {
+    const downloadUrls: string[] = [];
+    const uploadSizes: number[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes("/api/latency")) {
+          return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        }
+        if (url.includes("/api/download")) {
+          downloadUrls.push(url);
+          fakeNow += 1200;
+          return new Response(new Uint8Array(65_536), { status: 200 });
+        }
+        if (url.includes("/api/upload")) {
+          uploadSizes.push((init?.body as Uint8Array).byteLength);
+          fakeNow += 1200;
+          return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        }
+        return new Response(null, { status: 404 });
+      })
+    );
+
+    const result = await runSpeedTest({ ...testConfig, parallelConnections: 3 }, () => {}, new AbortController().signal);
+
+    expect(result.parallelConnections).toBe(3);
+    expect(result.testProfile).toBe("standard");
+    expect(downloadUrls.some((url) => url.includes("bytes=16777216"))).toBe(true);
+    expect(uploadSizes).toContain(262_144);
+  }, 10_000);
+
+  it("applies local throttle connection, payload, and result profile settings", async () => {
+    const downloadUrls: string[] = [];
+    const uploadSizes: number[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes("/api/latency")) {
+          return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        }
+        if (url.includes("/api/download")) {
+          downloadUrls.push(url);
+          fakeNow += 1200;
+          return new Response(new Uint8Array(65_536), { status: 200 });
+        }
+        if (url.includes("/api/upload")) {
+          uploadSizes.push((init?.body as Uint8Array).byteLength);
+          fakeNow += 1200;
+          return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        }
+        return new Response(null, { status: 404 });
+      })
+    );
+
+    const result = await runSpeedTest(
+      {
+        ...testConfig,
+        parallelConnections: 4,
+        localThrottle: { ...DEFAULT_LOCAL_THROTTLE, active: true }
+      },
+      () => {},
+      new AbortController().signal
+    );
+
+    expect(result.parallelConnections).toBe(1);
+    expect(result.testProfile).toBe("local-throttled");
+    expect(downloadUrls.some((url) => url.includes("bytes=262144"))).toBe(true);
+    expect(uploadSizes).toContain(131_072);
   }, 10_000);
 });

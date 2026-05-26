@@ -1,19 +1,19 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-26T10:36:04+08:00",
+  "last_updated": "2026-05-26T12:52:35+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
-  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, stability-first completion summaries, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible project documentation.",
-  "latest_summary": "Throughput statistics now use proportional startup trimming, discarding ceil(3%) of post-warmup samples while keeping at least one sample. Download and Upload continue to show the IQR-filtered stable mean; detail/report surfaces Stable Mean, P10, P50, P90, Raw CV, Stable CV, and samples kept. Stability summary now takes the worst grade from Raw CV, P10/Mean ratio, IQR outlier rate, and jitter. ThroughputStats, /api/results validation, SQLite persistence, migrations, reports, and tests support rawCvPercent with legacy fallback to cvPercent. The homepage now has fixed Quick 20s and Full 30s duration buttons, Quick is default, and the Admin Console duration label is clarified as a fallback duration.",
-  "next_action": "Review and commit the speed-test statistics optimization when ready. Separately decide whether the pre-existing .gitignore, AGENTS.md, deleted Ping-Pong project docx, untracked HTML specification, and other unrelated dirty files are intentional.",
+  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, stability-first completion summaries, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible project documentation.",
+  "latest_summary": "Implemented automatic Local throttled profile handling for allowed local self-tests. /api/config now advertises a localThrottle profile only for local clients that can run tests; worker runs use one connection, smaller payloads, and 32 Mbps pacing; saved results persist testProfile through validation, SQLite, Recent Results, completion summaries, and IT reports. A short desktop-height overlap that blocked Start was fixed by allowing natural page height below 821px.",
+  "next_action": "Push the local self-test throttling commit to origin/main when ready. Separately decide whether the pre-existing .gitignore, AGENTS.md, deleted Ping-Pong project docx, untracked HTML specification, and docs/analysis-data-debugging.md changes are intentional.",
   "git": {
     "branch": "main",
     "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "4baba95"
+    "commit": "19804fa"
   },
   "verification": {
     "status": "passed",
@@ -21,32 +21,47 @@
       "git rev-parse --is-inside-work-tree",
       "git status --short --branch",
       "git remote -v",
-      "test -f .ai/status.json && sed -n '1,240p' .ai/status.json",
+      "test -f .ai/status.json && sed -n '1,220p' .ai/status.json",
+      "npm test -- test/speed-test-core.test.ts test/api.test.ts test/report-export.test.ts test/speed-test-worker-client.test.ts test/result-summary.test.ts",
       "npm run typecheck",
-      "npm test -- test/api.test.ts",
       "npm test",
-      "npm run build",
       "git diff --check",
-      "rg -n '^PORT=' -g '.env*'",
+      "npm run build",
       "launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest",
       "lsof -nP -iTCP:8200 -sTCP:LISTEN",
       "curl -fsS http://127.0.0.1:8200/api/health",
-      "curl -fsS http://127.0.0.1:8200/api/report-context",
-      "curl -fsS http://127.0.0.1:8200/",
-      "curl -fsS 'http://127.0.0.1:8200/api/results/recent?limit=5&includeLocal=true'",
-      "In-app Browser verification checked Quick 20s default, Full 30s selection, Wired selection enabling Start, no console warnings/errors, and viewport layout at 1089x964, 1280x900, 1710x1021, 390x844, and 768x1024",
-      "node -e \"JSON.parse(require('node:fs').readFileSync('.ai/status.json','utf8')); console.log('status json ok')\"",
-      "python /Users/lindav/git/OctoPulse/tools/validate_status.py /Users/lindav/git/Ping\\ Pong/.ai/status.json"
+      "curl -fsS http://127.0.0.1:8200/api/config",
+      "curl -fsS http://127.0.0.1:8200/api/active-tests",
+      "In-app Browser DOM verification loaded http://127.0.0.1:8200/ and confirmed Local throttled banner with no console errors/warnings; screenshot capture timed out and Start click was not reliable there",
+      "Playwright CLI opened http://127.0.0.1:8200/, selected Wi-Fi, ran Quick 20s, observed ~32 Mbps throttled download, reached Test Summary with Local throttled, opened Recent Result detail with Profile Local throttled, and reported zero warning/error console messages",
+      "rm -rf .playwright-cli"
     ],
-    "last_verified_at": "2026-05-26T10:36:04+08:00",
-    "notes": "All automated checks passed after the speed-test statistics optimization: typecheck, full Vitest suite (8 files, 76 tests), production build, and git diff whitespace check. Tests cover 3% startup discard counts for 50/76/116 samples, proportional startup trimming, IQR mean behavior, Raw CV vs Stable CV on Wi-Fi-like data, stability downgrades from Raw CV, P10/Mean ratio, and IQR outlier rate, rawCvPercent API/SQLite save-read, and legacy migration fallback from cvPercent. The LaunchAgent-backed service was restarted on the configured .env port 8200 after the final build. Health, report-context, homepage, and recent-results API checks returned successfully. In-app Browser verification found Quick 20s selected by default, Full 30s selectable, Wired selection enabling Start, no console errors or warnings, no visible horizontal overflow, equal desktop first-row card widths, and desktop scroll height matching viewport height at 1089x964, 1280x900, and 1710x1021. Mobile 390x844 and tablet 768x1024 remained scrollable with all content reachable; the 390px layout was adjusted so Download/Upload diagnostic stats are readable in single-column primary cards."
+    "last_verified_at": "2026-05-26T12:45:25+08:00",
+    "notes": "Focused local-throttle tests passed with 5 files and 55 tests. Full typecheck passed, full Vitest passed with 8 files and 82 tests, git diff whitespace check passed, and production build passed. The LaunchAgent-backed service was restarted on .env port 8200; lsof confirmed node listening, health/config/active-tests checks returned successfully, and /api/config showed localThrottle active for localhost with 32 Mbps, 1 connection, 262144-byte download chunks, and 131072-byte upload bodies. In-app Browser confirmed the local throttled banner and clean console but its screenshot capture timed out and Start click was unreliable. Playwright CLI verification completed a localhost Quick 20s Wi-Fi run, observed throttled throughput around 32 Mbps during download, reached Test Summary with Local throttled, saved a Recent Result with Profile Local throttled, and reported zero warning/error console messages. A screenshot was copied to /tmp/ping-pong-qa/local-throttled-result-detail.png and transient .playwright-cli artifacts were removed. Browser verification remains a localhost local self-test, so real intranet performance still needs a separate non-local device run."
   },
   "attention": [
-    "Working tree remains dirty beyond .ai/status.json. It includes the speed-test statistics optimization plus pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong-\u5c08\u6848\u8aaa\u660e\u66f8.docx, untracked Ping-Pong-Project-Specification.html, docs/analysis-data-debugging.md, and other existing modified files that still need user decision before commit.",
+    "Working tree remains dirty beyond the local self-test throttling implementation because of pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, and docs/analysis-data-debugging.md.",
+    ".ai/status.json will need a post-commit refresh with the resulting commit hash after this implementation is committed.",
+    "The branch is ahead of origin/main by 2 commits and has not been pushed.",
     "The running service uses .env PORT=8200, not the README default 8080.",
-    "Browser verification used localhost with local self-test enabled by runtime settings; a non-local intranet device test is still required to evaluate real network performance."
+    "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
+    {
+      "id": "2026-05-26T12:45:25+08:00-code-local-throttle",
+      "at": "2026-05-26T12:45:25+08:00",
+      "kind": "code",
+      "summary": "Implemented automatic Local throttled profile handling so allowed localhost maintenance tests use capped traffic and are labeled across UI, storage, and reports.",
+      "verification": "npm test focused local-throttle files; npm run typecheck; npm test; git diff --check; npm run build; launchctl restart; curl health/config/active-tests; Playwright CLI Quick 20s local-throttled run completed and opened Recent Result detail with Profile Local throttled"
+    },
+    {
+      "id": "2026-05-26T12:03:41+08:00-commit-19804fa",
+      "at": "2026-05-26T12:03:41+08:00",
+      "kind": "commit",
+      "summary": "Committed the speed-test worker timeout fix so Quick 20s and Full 30s runs no longer time out before upload completes.",
+      "commit": "19804fa",
+      "verification": "git commit 19804fa; npm test -- test/speed-test-worker-client.test.ts; npm run typecheck; npm test; npm run build; launchctl restart; curl health/active-tests; in-app browser Quick 20s completed without timeout; git diff --check; status JSON parse; OctoPulse validate_status"
+    },
     {
       "id": "2026-05-26T10:36:04+08:00-code-4baba95",
       "at": "2026-05-26T10:36:04+08:00",

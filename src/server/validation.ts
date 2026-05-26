@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { NETWORK_LINK_TYPES, catSpeedRangeValidationMessage } from "../shared/contracts.js";
+import { NETWORK_LINK_TYPES, TEST_PROFILES, catSpeedRangeValidationMessage } from "../shared/contracts.js";
 import { MAX_ALLOWED_TEST_BYTES } from "./config.js";
 
 const throughputStatsSchema = z
@@ -34,7 +34,8 @@ export const resultPayloadSchema = z
     httpLossPercent: z.number().finite().min(0).max(100),
     durationSeconds: z.number().int().min(1).max(3600),
     parallelConnections: z.number().int().min(1).max(64),
-    networkLinkType: z.enum(NETWORK_LINK_TYPES).default("unknown")
+    networkLinkType: z.enum(NETWORK_LINK_TYPES).default("unknown"),
+    testProfile: z.enum(TEST_PROFILES).default("standard")
   })
   .transform((payload) => {
     const downloadStats = payload.downloadStats ?? legacyThroughputStats(payload.downloadMbps);

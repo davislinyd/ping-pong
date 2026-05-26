@@ -6,7 +6,7 @@ The app is intentionally non-containerized: one Node.js service serves both the 
 
 If the browser runs on the same machine as the speed-test service, the app treats it as a local self-test. Those numbers are useful only for checking that the app works because they measure loopback or the host network stack, not the real intranet path.
 
-Local self-tests are blocked by default. Set `ALLOW_LOCAL_SELF_TEST=true` only for short maintenance checks when you intentionally want to test the app from the server itself.
+Local self-tests are blocked by default. Set `ALLOW_LOCAL_SELF_TEST=true` only for short maintenance checks when you intentionally want to test the app from the server itself. When a local self-test is allowed, the browser automatically uses the `Local throttled` profile: one connection, smaller payloads, and about 32 Mbps of paced traffic so the maintenance run can finish without overwhelming the local browser tab. Those results remain marked as local maintenance checks and are not valid intranet throughput measurements.
 
 ## Requirements
 
@@ -58,7 +58,7 @@ The user homepage at `/` is focused on one speed-test workflow:
 - top status pills show active test capacity and the running app version
 - the browser tab uses a generated pixel-style download-over-WiFi favicon with transparent space outside the frame
 - the running app version pill doubles as a hidden admin entry: click it five times in a row to open `/admin`
-- warning banners appear when the browser is a local self-test or concurrent test capacity is near/full
+- warning banners appear when the browser is a local self-test or concurrent test capacity is near/full; allowed local self-tests also show `Local throttled`
 - the main test panel groups the live Mbps readout, phase progress, current status, and start/retest action
 - the current status area shows the server-seen `Client IP` and whether it came directly from the request or from trusted proxy handling; the value is refreshed before each test starts
 - the current status area requires a simple `Wired` or `Wi-Fi` button choice before each test starts; the choice is saved with that run
@@ -184,6 +184,7 @@ Saved fields include:
 - idle and loaded latency
 - jitter and HTTP loss
 - duration and parallel connection count
+- test profile (`Standard` or `Local throttled`)
 - selected network link type (`Wired`, `Wi-Fi`, or legacy `Unknown`)
 - server-seen client IP for that saved test result; rows saved before this field existed show `Not recorded` in the UI
 - browser family
@@ -191,7 +192,7 @@ Saved fields include:
 - hashed browser/device id used only to keep Recent Results scoped to the same browser
 - whether the result came from a local self-test
 
-Your Recent Results is scoped to the same browser/device and includes that browser's local self-tests so maintenance runs are visible to the person who ran them. Local self-tests still show the warning banner because they are not real intranet measurements. Existing rows created before browser/device scoping do not appear in personal Recent Results because they cannot be safely assigned to one browser.
+Your Recent Results is scoped to the same browser/device and includes that browser's local self-tests so maintenance runs are visible to the person who ran them. Local self-tests still show the warning banner because they are not real intranet measurements. Allowed local self-tests are saved and exported with the `Local throttled` profile label. Existing rows created before browser/device scoping do not appear in personal Recent Results because they cannot be safely assigned to one browser.
 
 Users can delete their own browser/device-scoped Recent Results from the homepage. This does not delete other users' rows or legacy rows without a browser/device hash. Admin Console deletion remains the only UI path for clearing all saved results.
 
@@ -210,9 +211,9 @@ Then check:
 curl http://127.0.0.1:8080/api/health
 ```
 
-Open `http://127.0.0.1:8080` to verify the page loads. Because local self-tests are blocked by default, run a valid speed test from another intranet device unless `ALLOW_LOCAL_SELF_TEST=true` is temporarily enabled for maintenance.
+Open `http://127.0.0.1:8080` to verify the page loads. Because local self-tests are blocked by default, run a valid speed test from another intranet device unless `ALLOW_LOCAL_SELF_TEST=true` is temporarily enabled for maintenance. When local self-test is enabled, confirm the banner shows `Local throttled`, Quick 20s can complete without crashing the browser tab, and saved/detail/report surfaces keep the `Local throttled` label.
 
-For UI changes, also check the homepage at desktop, tablet, and mobile widths to confirm the test panel, connection IP strip, link-type buttons, Quick/Full duration selector, metric groups, and Recent Results chart do not overlap or overflow. For desktop layout work, verify `1089x964`, `1280x900`, and `1710x1021`: the full-page height should match the viewport height, the two top-row cards should have equal width, and the live readout card should not be vertically stretched by empty space. Mobile viewports may remain vertically scrollable as long as all content is reachable. Confirm the current status area shows `Client IP` and `Source` from `/api/report-context`; if that endpoint is unavailable, the homepage should show `Connection unavailable` without blocking the speed-test controls. Confirm `Quick 20s` is selected by default and `Full 30s` can be selected before starting a run. When checking Recent Results, confirm hover and keyboard focus both show the tooltip with selected link type and saved client IP, confirm the active download/upload bars brighten, and confirm click or keyboard activation opens the saved-record popup with a `Client IP` tile. Legacy rows without a stored IP should show `Not recorded`.
+For UI changes, also check the homepage at desktop, tablet, and mobile widths to confirm the test panel, connection IP strip, link-type buttons, Quick/Full duration selector, metric groups, and Recent Results chart do not overlap or overflow. For desktop layout work, verify `1089x964`, `1280x900`, and `1710x1021`: the full-page height should match the viewport height, the two top-row cards should have equal width, and the live readout card should not be vertically stretched by empty space. Mobile viewports may remain vertically scrollable as long as all content is reachable. Confirm the current status area shows `Client IP` and `Source` from `/api/report-context`; if that endpoint is unavailable, the homepage should show `Connection unavailable` without blocking the speed-test controls. Confirm `Quick 20s` is selected by default and `Full 30s` can be selected before starting a run. When checking Recent Results, confirm hover and keyboard focus both show the tooltip with selected link type, saved client IP, and `Local throttled` profile when applicable; confirm the active download/upload bars brighten, and confirm click or keyboard activation opens the saved-record popup with `Client IP` and `Profile` tiles. Legacy rows without a stored IP should show `Not recorded`.
 
 When checking metric detail interactions, confirm all six metric cards open the detail dialog, the main live readout does not open a dialog, hover over the enlarged chart shows the nearest sample value, and Esc, backdrop click, and the close button all dismiss the dialog.
 

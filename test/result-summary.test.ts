@@ -162,6 +162,7 @@ function baseResult(patch: Partial<ResultPayload> = {}): ResultPayload {
     durationSeconds: 15,
     parallelConnections: 4,
     networkLinkType: "unknown",
+    testProfile: "standard",
     ...patch
   };
 }

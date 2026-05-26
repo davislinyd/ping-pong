@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ResultPayload, RuntimeConfigResponse, ThroughputStats } from "../src/shared/contracts";
+import { DEFAULT_LOCAL_THROTTLE, type ResultPayload, type RuntimeConfigResponse, type ThroughputStats } from "../src/shared/contracts";
 import { isSpeedTestWorkerAbort, startSpeedTestWorker, type SpeedTestWorkerLike } from "../src/client/speed-test-worker-client";
 import type { SpeedTestWorkerMessage, SpeedTestWorkerRequest } from "../src/client/speed-test-worker-protocol";
 import type { TestProgress } from "../src/client/speed-test-core";
@@ -175,6 +175,7 @@ function baseConfig(patch: Partial<RuntimeConfigResponse> = {}): RuntimeConfigRe
       reason: "loopback",
       message: null
     },
+    localThrottle: DEFAULT_LOCAL_THROTTLE,
     ...patch
   };
 }
@@ -193,6 +194,7 @@ function baseResult(patch: Partial<ResultPayload> = {}): ResultPayload {
     durationSeconds: 8,
     parallelConnections: 4,
     networkLinkType: "unknown",
+    testProfile: "standard",
     ...patch
   };
 }

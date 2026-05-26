@@ -1,9 +1,11 @@
 export const CAT_SPEED_STAGES = ["idle", "walk", "jog", "run", "sprint"] as const;
 export const NETWORK_LINK_TYPES = ["wired", "wifi", "unknown"] as const;
+export const TEST_PROFILES = ["standard", "local-throttled"] as const;
 export const BROWSER_CLIENT_ID_HEADER = "X-Ping-Pong-Browser-Id";
 
 export type CatSpeedStage = (typeof CAT_SPEED_STAGES)[number];
 export type NetworkLinkType = (typeof NETWORK_LINK_TYPES)[number];
+export type TestProfile = (typeof TEST_PROFILES)[number];
 
 export type CatSpeedRange = {
   minMbps: number;
@@ -20,6 +22,22 @@ export const DEFAULT_CAT_SPEED_RANGES: CatSpeedRanges = {
   sprint: { minMbps: 800, maxMbps: null }
 };
 
+export type LocalThrottleConfig = {
+  active: boolean;
+  maxMbps: number;
+  parallelConnections: number;
+  downloadChunkBytes: number;
+  uploadChunkBytes: number;
+};
+
+export const DEFAULT_LOCAL_THROTTLE: LocalThrottleConfig = {
+  active: false,
+  maxMbps: 32,
+  parallelConnections: 1,
+  downloadChunkBytes: 262_144,
+  uploadChunkBytes: 131_072
+};
+
 export type RuntimeConfigResponse = {
   serverName: string;
   defaultTestDurationSeconds: number;
@@ -27,6 +45,7 @@ export type RuntimeConfigResponse = {
   maxTestBytes: number;
   catSpeedRanges: CatSpeedRanges;
   clientSafety: ClientSafety;
+  localThrottle: LocalThrottleConfig;
 };
 
 export type ReportContextResponse = {
@@ -112,6 +131,7 @@ export type ResultPayload = {
   durationSeconds: number;
   parallelConnections: number;
   networkLinkType: NetworkLinkType;
+  testProfile: TestProfile;
 };
 
 export type ThroughputStats = {

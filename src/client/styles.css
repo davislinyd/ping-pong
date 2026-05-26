@@ -201,6 +201,25 @@ button.version-pill {
   font-size: 0.95rem;
 }
 
+.local-throttle-badge,
+.completion-profile {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.local-throttle-badge {
+  margin: 2px 0 6px;
+}
+
 .local-warning p,
 .capacity-warning p {
   color: #7a4d05;
@@ -373,6 +392,17 @@ button.version-pill {
   color: #24313a;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.completion-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.completion-badges .completion-link-type {
+  margin-top: 0;
 }
 
 .completion-summary-grid {
@@ -1784,6 +1814,18 @@ button.server-pill {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 981px) and (max-height: 820px) {
+  .app-shell {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .dashboard-shell,
+  .dashboard-stack {
+    min-height: auto;
   }
 }
 

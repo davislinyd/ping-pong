@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
-import { DEFAULT_CAT_SPEED_RANGES } from "../src/shared/contracts";
+import { DEFAULT_CAT_SPEED_RANGES, DEFAULT_LOCAL_THROTTLE } from "../src/shared/contracts";
 import { createApp } from "../src/server/app";
 import { browserClientHash } from "../src/server/client-identity";
 import { loadConfig } from "../src/server/config";
@@ -55,6 +55,10 @@ describe("speed test API", () => {
       clientSafety: {
         isLocalClient: true,
         canRunTest: true
+      },
+      localThrottle: {
+        ...DEFAULT_LOCAL_THROTTLE,
+        active: true
       }
     });
   });
@@ -123,6 +127,25 @@ describe("speed test API", () => {
         trustProxyAware: true,
         browserFamily: "Firefox"
       });
+
+      const config = await proxyApp.inject({
+        method: "GET",
+        url: "/api/config",
+        headers: {
+          "x-forwarded-for": "10.20.30.40"
+        }
+      });
+
+      expect(config.statusCode).toBe(200);
+      expect(config.json()).toMatchObject({
+        clientSafety: {
+          isLocalClient: false,
+          canRunTest: true
+        },
+        localThrottle: {
+          active: false
+        }
+      });
     } finally {
       await proxyApp.close();
     }
@@ -150,6 +173,9 @@ describe("speed test API", () => {
         clientSafety: {
           isLocalClient: true,
           canRunTest: false
+        },
+        localThrottle: {
+          active: false
         }
       });
 
@@ -560,6 +586,7 @@ describe("speed test API", () => {
         filteredSampleCount: 50
       },
       networkLinkType: "wifi",
+      testProfile: "standard",
       isLocalClient: true
     });
     expect(saved.json().downloadMbps).toBe(saved.json().downloadStats.meanMbps);
@@ -594,6 +621,7 @@ describe("speed test API", () => {
       clientIp: "127.0.0.1",
       isLocalClient: true,
       networkLinkType: "wifi",
+      testProfile: "standard",
       downloadStats: payload.downloadStats,
       uploadStats: {
         meanMbps: 82.4,
@@ -652,7 +680,7 @@ describe("speed test API", () => {
     });
 
     expect(firstBrowserRecent.json()).toHaveLength(1);
-    expect(firstBrowserRecent.json()[0]).toMatchObject({ downloadMbps: 120.5, browserFamily: "Chrome", clientIp: "127.0.0.1", networkLinkType: "wifi" });
+    expect(firstBrowserRecent.json()[0]).toMatchObject({ downloadMbps: 120.5, browserFamily: "Chrome", clientIp: "127.0.0.1", networkLinkType: "wifi", testProfile: "standard" });
     expect(secondBrowserRecent.json()).toHaveLength(1);
     expect(secondBrowserRecent.json()[0]).toMatchObject({ downloadMbps: 95, browserFamily: "Firefox", clientIp: "127.0.0.1", networkLinkType: "wired" });
     expect(missingBrowserRecent.json()).toHaveLength(0);
@@ -869,6 +897,7 @@ describe("speed test API", () => {
         serverName: "Legacy Node",
         clientIp: null,
         networkLinkType: "wifi",
+        testProfile: "standard",
         downloadStats: { cvPercent: 5, rawCvPercent: 5 },
         uploadStats: { cvPercent: 4, rawCvPercent: 4 }
       });
@@ -902,6 +931,7 @@ describe("speed test API", () => {
       downloadMbps: 42,
       uploadMbps: 24,
       networkLinkType: "unknown",
+      testProfile: "standard",
       downloadStats: { p10Mbps: 42, p50Mbps: 42, p90Mbps: 42, rawCvPercent: 0, sampleCount: 0 },
       uploadStats: { p10Mbps: 24, p50Mbps: 24, p90Mbps: 24, rawCvPercent: 0, sampleCount: 0 }
     });

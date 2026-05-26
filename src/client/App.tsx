@@ -94,6 +94,7 @@ function SpeedTestApp() {
   const mainDisplayValue = isSpeedPhase && currentMbps === null ? "--" : formatNumber(isSpeedPhase && currentMbps !== null ? currentMbps : result.downloadMbps);
   const roundedProgress = Math.round(progressPercent);
   const localClientWarning = config?.clientSafety.isLocalClient ? config.clientSafety.message : null;
+  const localThrottleActive = config?.localThrottle.active ?? false;
   const testBlocked = config ? !config.clientSafety.canRunTest : false;
   const activeTests = activeStatus.activeTests;
   const concurrencyFull = !testBlocked && activeStatus.isFull;
@@ -300,7 +301,9 @@ function SpeedTestApp() {
               <TriangleAlert size={20} />
               <div>
                 <strong>Local self-test detected</strong>
+                {localThrottleActive ? <span className="local-throttle-badge">Local throttled</span> : null}
                 <p>{localClientWarning} Open this page from another device to run a valid intranet speed test.</p>
+                {localThrottleActive ? <p>Local maintenance traffic is capped at {config?.localThrottle.maxMbps} Mbps so this browser tab can finish the test.</p> : null}
               </div>
             </section>
           ) : null}
@@ -325,7 +328,7 @@ function SpeedTestApp() {
             <div className="test-panel-main">
               <div className={`speed-test-display phase-${phase}${phase === "complete" ? ` summary-${completionSummary.verdict}` : ""}`}>
                 {phase === "complete" ? (
-                  <CompletionSummaryPanel summary={completionSummary} />
+                  <CompletionSummaryPanel summary={completionSummary} testProfile={result.testProfile} />
                 ) : (
                   <>
                     <div className="speed-readout">
@@ -503,14 +506,17 @@ function TransferSummary({ downloadMegabits, uploadMegabits }: { downloadMegabit
   );
 }
 
-function CompletionSummaryPanel({ summary }: { summary: CompletionSummary }) {
+function CompletionSummaryPanel({ summary, testProfile }: { summary: CompletionSummary; testProfile: ResultPayload["testProfile"] }) {
   return (
     <div className="completion-summary" aria-label="Test summary">
       <div>
         <span className="completion-summary-kicker">Test Summary</span>
         <strong className="completion-summary-title">{summary.title}</strong>
         <p className="completion-summary-subtitle">{summary.subtitle}</p>
-        <span className="completion-link-type">Link: {summary.networkLinkTypeLabel}</span>
+        <div className="completion-badges">
+          <span className="completion-link-type">Link: {summary.networkLinkTypeLabel}</span>
+          {testProfile === "local-throttled" ? <span className="completion-profile">Local throttled</span> : null}
+        </div>
       </div>
       <div className="completion-summary-grid">
         {summary.tiles.map((tile) => (
@@ -690,6 +696,7 @@ function HistoryDetailModal({ result, onClose }: { result: SavedResult; onClose:
               <span>Recent Result</span>
               <strong>{formatDateTime(result.createdAt)}</strong>
               {result.isLocalClient ? <em>Local self-test</em> : null}
+              {result.testProfile === "local-throttled" ? <em>Local throttled</em> : null}
             </div>
           </div>
           <button className="metric-modal-close" type="button" aria-label="Close recent result details" onClick={onClose}>
@@ -710,6 +717,7 @@ function HistoryDetailModal({ result, onClose }: { result: SavedResult; onClose:
           <HistoryDetailTile label="HTTP Loss" value={formatNumber(result.httpLossPercent)} unit="%" />
           <HistoryDetailTile label="Duration" value={String(result.durationSeconds)} unit="sec" />
           <HistoryDetailTile label="Connections" value={String(result.parallelConnections)} />
+          <HistoryDetailTile label="Profile" value={testProfileLabel(result.testProfile)} />
           <HistoryDetailTile label="Browser" value={result.browserFamily} />
         </div>
 
@@ -851,6 +859,12 @@ function HistoryBars({ results, onOpen }: { results: SavedResult[]; onOpen: (res
                 <span>Client IP</span>
                 <strong>{resultClientIpText(item)}</strong>
               </div>
+              {item.testProfile === "local-throttled" ? (
+                <div className="history-tooltip-row">
+                  <span>Profile</span>
+                  <strong>Local throttled</strong>
+                </div>
+              ) : null}
             </div>
           </button>
         );
@@ -993,7 +1007,8 @@ function formatDateTime(value: string): string {
 
 function historyItemLabel(item: SavedResult): string {
   const localPrefix = item.isLocalClient ? "Local self-test, " : "";
-  return `${localPrefix}${formatDateTime(item.createdAt)}, ${networkLinkTypeLabel(item.networkLinkType)} link, Client IP ${resultClientIpText(item)}, Download ${formatNumber(item.downloadMbps)} Mbps, Upload ${formatNumber(item.uploadMbps)} Mbps`;
+  const profilePrefix = item.testProfile === "local-throttled" ? "Local throttled, " : "";
+  return `${localPrefix}${profilePrefix}${formatDateTime(item.createdAt)}, ${networkLinkTypeLabel(item.networkLinkType)} link, Client IP ${resultClientIpText(item)}, Download ${formatNumber(item.downloadMbps)} Mbps, Upload ${formatNumber(item.uploadMbps)} Mbps`;
 }
 
 function historyTooltipPlacement(index: number, total: number): string {
@@ -1004,4 +1019,8 @@ function historyTooltipPlacement(index: number, total: number): string {
 
 function resultClientIpText(result: SavedResult): string {
   return result.clientIp ?? "Not recorded";
+}
+
+function testProfileLabel(profile: ResultPayload["testProfile"]): string {
+  return profile === "local-throttled" ? "Local throttled" : "Standard";
 }

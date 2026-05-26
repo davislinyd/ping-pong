@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_CAT_SPEED_RANGES, type ActiveTestsResponse, type ReportContextResponse, type RuntimeConfigResponse, type SavedResult } from "../src/shared/contracts";
+import { DEFAULT_CAT_SPEED_RANGES, DEFAULT_LOCAL_THROTTLE, type ActiveTestsResponse, type ReportContextResponse, type RuntimeConfigResponse, type SavedResult } from "../src/shared/contracts";
 import type { CompletionSummary } from "../src/client/result-summary";
 import {
   buildReportSnapshot,
@@ -127,6 +127,7 @@ describe("IT diagnostic report export", () => {
     expect(findRow(sections, "Load note")?.value).toContain("Multiple tests active");
     expect(findRow(sections, "CPU thread hint")?.value).toBe("10 logical threads");
     expect(findRow(sections, "Selected link type")?.value).toBe("Wi-Fi");
+    expect(findRow(sections, "Test profile")?.value).toBe("Standard");
     expect(findRow(sections, "Download Stable Mean")?.value).toBe("420 Mbps");
     expect(findRow(sections, "Download P10 / P50 / P75 / P90")?.value).toBe("390 Mbps / 420 Mbps / 440 Mbps / 460 Mbps");
     expect(findRow(sections, "Download Raw CV / Stable CV")?.value).toBe("18% / 6.50%");
@@ -134,6 +135,35 @@ describe("IT diagnostic report export", () => {
     expect(findRow(sections, "Upload Raw CV / Stable CV")?.value).toBe("24% / 12%");
     expect(findRow(sections, "Upload Samples kept")?.value).toBe("38/40 kept");
     expect(findRow(sections, "Worst loaded latency")?.value).toBe("35 ms");
+  });
+
+  it("labels local throttled reports in Markdown and sections", () => {
+    const snapshot = buildReportSnapshot({
+      savedResult: baseSavedResult({ isLocalClient: true, testProfile: "local-throttled", parallelConnections: 1 }),
+      config: baseConfig({ localThrottle: { ...DEFAULT_LOCAL_THROTTLE, active: true } }),
+      summary: baseSummary(),
+      activeStatus: baseActiveStatus(),
+      transferMegabits: { download: 120, upload: 80 },
+      context: baseReportContext({
+        clientSafety: {
+          isLocalClient: true,
+          canRunTest: true,
+          reason: "loopback",
+          message: "Local self-test result"
+        }
+      }),
+      appVersion: "0.1.0",
+      pageUrl: "http://127.0.0.1:8200/",
+      generatedAt: new Date("2026-05-14T04:05:06.000Z"),
+      diagnostics: clientDiagnosticsFromSource()
+    });
+
+    const markdown = renderReportMarkdown(snapshot);
+    const sections = reportSections(snapshot);
+
+    expect(markdown).toContain('testProfile: "Local throttled"');
+    expect(markdown).toContain("Local throttled profile: yes");
+    expect(findRow(sections, "Test profile")?.value).toBe("Local throttled");
   });
 
   it("includes test charts in HTML reports from metric series", () => {
@@ -186,7 +216,7 @@ function findRow(sections: ReturnType<typeof reportSections>, label: string) {
   return sections.flatMap((section) => section.rows).find((row) => row.label === label);
 }
 
-function baseConfig(): RuntimeConfigResponse {
+function baseConfig(patch: Partial<RuntimeConfigResponse> = {}): RuntimeConfigResponse {
   return {
     serverName: "Test Node",
     defaultTestDurationSeconds: 15,
@@ -198,7 +228,9 @@ function baseConfig(): RuntimeConfigResponse {
       canRunTest: true,
       reason: null,
       message: null
-    }
+    },
+    localThrottle: DEFAULT_LOCAL_THROTTLE,
+    ...patch
   };
 }
 
@@ -256,6 +288,7 @@ function baseSavedResult(patch: Partial<SavedResult> = {}): SavedResult {
     durationSeconds: 15,
     parallelConnections: 4,
     networkLinkType: "wifi",
+    testProfile: "standard",
     ...patch
   };
 }
