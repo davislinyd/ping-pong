@@ -5,6 +5,7 @@ import {
   Cable,
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   Clock3,
   Database,
   FileText,
@@ -94,6 +95,7 @@ function SpeedTestApp() {
   const [selectedMetricLabel, setSelectedMetricLabel] = useState<string | null>(null);
   const [selectedHistoryResult, setSelectedHistoryResult] = useState<SavedResult | null>(null);
   const [rawDataOpen, setRawDataOpen] = useState(false);
+  const [speedGuideOpen, setSpeedGuideOpen] = useState(false);
   const [selectedNetworkLinkType, setSelectedNetworkLinkType] = useState<SelectableNetworkLinkType | null>(null);
   const [selectedTestDurationSeconds, setSelectedTestDurationSeconds] = useState<TestDurationSeconds>(DEFAULT_TEST_DURATION_SECONDS);
   const [connectionContext, setConnectionContext] = useState<ConnectionContextState>({ status: "loading", context: null });
@@ -175,19 +177,20 @@ function SpeedTestApp() {
   }, []);
 
   useEffect(() => {
-    if (!selectedMetricLabel && !selectedHistoryResult && !rawDataOpen) return;
+    if (!selectedMetricLabel && !selectedHistoryResult && !rawDataOpen && !speedGuideOpen) return;
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setSelectedMetricLabel(null);
         setSelectedHistoryResult(null);
         setRawDataOpen(false);
+        setSpeedGuideOpen(false);
       }
     }
 
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedMetricLabel, selectedHistoryResult, rawDataOpen]);
+  }, [selectedMetricLabel, selectedHistoryResult, rawDataOpen, speedGuideOpen]);
 
   useEffect(() => {
     setActiveNoticeIndex((index) => Math.min(index, Math.max(warningNotices.length - 1, 0)));
@@ -350,6 +353,10 @@ function SpeedTestApp() {
               {activeTests}/{activeStatus.maxActiveTests} testing now
             </span>
           </div>
+          <button className="server-pill guide-pill" type="button" aria-haspopup="dialog" aria-expanded={speedGuideOpen} aria-label="Open speed-test guide" onClick={() => setSpeedGuideOpen(true)}>
+            <CircleHelp size={17} />
+            <span>Speed Guide</span>
+          </button>
           <button className="server-pill version-pill" type="button" aria-label={`App version v${__APP_VERSION__}`} onClick={handleAdminEntryClick}>
             <Server size={17} />
             <span>v{__APP_VERSION__}</span>
@@ -464,6 +471,7 @@ function SpeedTestApp() {
       {selectedMetric ? <MetricDetailModal metric={selectedMetric} onClose={() => setSelectedMetricLabel(null)} /> : null}
       {selectedHistoryResult ? <HistoryDetailModal result={selectedHistoryResult} onClose={() => setSelectedHistoryResult(null)} /> : null}
       {rawDataOpen && lastSavedResult && rawData ? <RawDataModal result={lastSavedResult} rawData={rawData} onClose={() => setRawDataOpen(false)} /> : null}
+      {speedGuideOpen ? <SpeedGuideModal onClose={() => setSpeedGuideOpen(false)} /> : null}
     </main>
   );
 
@@ -854,6 +862,138 @@ function MetricDetailModal({ metric, onClose }: { metric: Metric; onClose: () =>
         {metric.stats ? <MetricStatsPanel stats={metric.stats} /> : null}
         <InteractiveMetricChart metric={metric} />
       </section>
+    </div>
+  );
+}
+
+function SpeedGuideModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="metric-modal-backdrop" onMouseDown={onClose}>
+      <section className="metric-modal speed-guide-modal" role="dialog" aria-modal="true" aria-label="Speed-test guide" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="metric-modal-header">
+          <div className="metric-modal-title">
+            <CircleHelp size={22} strokeWidth={2.2} />
+            <div>
+              <span>Speed Guide</span>
+              <strong>How results are measured and judged</strong>
+              <em>Reference notes and IT diagnostic thresholds</em>
+            </div>
+          </div>
+          <button className="metric-modal-close" type="button" aria-label="Close speed-test guide" onClick={onClose}>
+            <X size={20} strokeWidth={2.2} />
+          </button>
+        </div>
+
+        <div className="speed-guide-content">
+          <section className="speed-guide-section">
+            <h2>How Values Are Collected</h2>
+            <p>
+              The test runs in a browser Web Worker. Quick 20s and Full 30s send download, upload, and latency requests to the same intranet service. Each throughput sample converts the bytes observed in its time window into Mbps.
+            </p>
+            <p>
+              The first segment, up to 1 second, is warmup and is excluded from throughput statistics. After warmup, the first roughly 3% of startup samples are trimmed. The main Download and Upload values use the IQR-filtered stable mean so short spikes or drops do not dominate the headline speed.
+            </p>
+          </section>
+
+          <section className="speed-guide-section">
+            <h2>How To Read The Metrics</h2>
+            <div className="speed-guide-grid">
+              <GuideTile label="P10 Low" value="Low-speed experience" detail="If it is far below stable mean, users may feel stalls or drops." />
+              <GuideTile label="P50 Typical" value="Typical value" detail="The median value, showing where most samples sit." />
+              <GuideTile label="P75 / Q3, P90" value="Upper range" detail="Shows stronger throughput periods, but not stability by itself." />
+              <GuideTile label="Raw CV" value="Raw variability" detail="Relative variation before IQR filtering; keeps spike and drop signals." />
+              <GuideTile label="Stable CV" value="Stable variability" detail="Relative variation after IQR filtering; shows whether stable mean is concentrated." />
+              <GuideTile label="IQR kept" value="Sample confidence" detail="A lower kept ratio means more outliers and a more diagnostic result." />
+            </div>
+          </section>
+
+          <section className="speed-guide-section">
+            <h2>Quality Thresholds</h2>
+            <div className="speed-guide-tables">
+              <GuideThresholdTable
+                title="Reliability / HTTP Loss"
+                rows={[
+                  ["Excellent", "0%"],
+                  ["Good", "<= 0.5%"],
+                  ["Fair", "<= 2%"],
+                  ["Poor", "> 2%"]
+                ]}
+              />
+              <GuideThresholdTable
+                title="Responsiveness / Loaded latency"
+                rows={[
+                  ["Excellent", "<= 50 ms"],
+                  ["Good", "<= 100 ms"],
+                  ["Fair", "<= 200 ms"],
+                  ["Poor", "> 200 ms"]
+                ]}
+              />
+            </div>
+          </section>
+
+          <section className="speed-guide-section">
+            <h2>Stability Thresholds</h2>
+            <div className="speed-guide-compare">
+              <div>
+                <h3>Wired / Unknown</h3>
+                <ul>
+                  <li>Raw CV: 10 / 20 / 35%</li>
+                  <li>P10 / Mean: 85 / 70 / 50%</li>
+                  <li>IQR outlier: 2 / 5 / 10%</li>
+                  <li>Jitter: 5 / 15 / 30 ms</li>
+                </ul>
+              </div>
+              <div>
+                <h3>Wi-Fi</h3>
+                <ul>
+                  <li>Raw CV: 15 / 30 / 45%</li>
+                  <li>P10 ratio or P10: 85 / 70 / 50%, or 500 / 300 / 150 Mbps</li>
+                  <li>IQR outlier: 5 / 10 / 20%</li>
+                  <li>Jitter: 8 / 20 / 40 ms</li>
+                </ul>
+              </div>
+            </div>
+            <p>
+              Wired results use stricter worst-grade judging. Wi-Fi is a shared medium, so a connection can be variable but still usable when throughput remains practical. To isolate wireless environment, device, or signal issues, retest on Wired.
+            </p>
+          </section>
+
+          <section className="speed-guide-section speed-guide-note">
+            <h2>Limits</h2>
+            <p>
+              Local throttled results are maintenance checks only, not real intranet path measurements. Wi-Fi results include signal quality, interference, client hardware, and power-saving behavior. Interpret results together with link type, duration, sample count, and Raw Data.
+            </p>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function GuideTile({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="speed-guide-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <em>{detail}</em>
+    </div>
+  );
+}
+
+function GuideThresholdTable({ title, rows }: { title: string; rows: Array<[string, string]> }) {
+  return (
+    <div className="speed-guide-table-block">
+      <h3>{title}</h3>
+      <table className="speed-guide-threshold-table">
+        <tbody>
+          {rows.map(([grade, threshold]) => (
+            <tr key={grade}>
+              <th scope="row">{grade}</th>
+              <td>{threshold}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

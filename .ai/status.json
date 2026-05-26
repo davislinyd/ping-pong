@@ -1,53 +1,68 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-26T21:40:53+08:00",
+  "last_updated": "2026-05-26T22:43:18+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
-  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Updated throughput detail cards to keep the 8-tile layout while renaming P75 Upper to P75 / Q3 and replacing Samples kept with IQR kept plus outlier-rate detail. P25/Q1 remains documented as an IQR calculation concept without adding API, DB, or payload fields.",
-  "next_action": "Review and commit the throughput detail card display helper, tests, README and whitepaper updates, and refreshed status snapshot; keep unrelated dirty files out of that commit.",
+  "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.0 with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
+  "latest_summary": "Bumped the uncommitted app version from 0.2.0 to 0.3.0 in package metadata and README. The live rebuilt homepage now shows `v0.3.0` between `Speed Guide` and the hidden admin version pill behavior, with no visible `v0.2.0` remaining.",
+  "next_action": "Review and commit the version bump plus guide modal changes when ready, then decide whether to include, discard, or separately commit the unrelated dirty files before pushing main to origin/main.",
   "git": {
     "branch": "main",
     "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "f138669"
+    "commit": "9732da7"
   },
   "verification": {
-    "status": "passed",
+    "status": "partial",
     "last_commands": [
       "git rev-parse --is-inside-work-tree",
       "git status --short --branch",
       "git remote -v",
       "npm run typecheck",
       "npm test",
-      "npm test -- test/throughput-display.test.ts",
-      "git diff --check -- src/client/App.tsx src/client/throughput-display.ts test/throughput-display.test.ts README.md docs/speed-test-statistics-whitepaper.md",
+      "git diff --check -- package.json package-lock.json README.md src/client/App.tsx src/client/styles.css .ai/status.json",
       "npm run build",
       "launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest",
       "lsof -nP -iTCP:8200 -sTCP:LISTEN",
       "curl -fsS http://127.0.0.1:8200/api/health",
       "curl -fsS http://127.0.0.1:8200/ | head -20",
-      "Browser Download/Upload metric modal QA at 1089x964, 1280x900, 1710x1021, and 390x844"
+      "Browser rendered v0.3.0 verification at 1089x964, 1280x900, 1710x1021, and 390x844"
     ],
-    "last_verified_at": "2026-05-26T21:40:53+08:00",
-    "notes": "Throughput detail card verification passed. The new iqrKeptDisplay helper passed focused tests for 82/97, 97/97, and 0/0 cases; typecheck, whitespace diff check, full Vitest suite (97 tests), and production build passed. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser QA confirmed Download and Upload detail modals show P75 / Q3, IQR kept, and 0% outliers at 1089x964, 1280x900, 1710x1021, and 390x844 with no horizontal overflow and no console warnings/errors. Browser screenshots were saved under /tmp/ping-pong-iqr-kept-*.png."
+    "last_verified_at": "2026-05-26T22:43:18+08:00",
+    "notes": "Version bump verification is partial only because Browser screenshot capture is unavailable in this session, so rendered verification used DOM and interaction proof. Typecheck, whitespace diff check, full Vitest suite (97 tests), and production build passed with package version 0.3.0. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser DOM QA confirmed the topbar order is `0/4 testing now | Speed Guide | v0.3.0`, no visible `v0.2.0` remains, there is only one `button.version-pill`, there is no horizontal overflow at 1089x964, 1280x900, 1710x1021, and 390x844, the hidden admin five-click entry still opens `/admin`, and console warnings/errors are empty."
   },
   "attention": [
-    "Current throughput detail card changes are uncommitted in README.md, docs/speed-test-statistics-whitepaper.md, src/client/App.tsx, src/client/throughput-display.ts, test/throughput-display.test.ts, and .ai/status.json.",
-    "Working tree also remains dirty because of unrelated pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, and docs/analysis-data-debugging.md.",
-    "Branch main is ahead of origin/main by 2 commits, including f138669.",
+    ".ai/status.json was refreshed after the uncommitted version bump and guide modal implementation and is intentionally uncommitted as the current delivery-state snapshot.",
+    "Working tree now includes uncommitted version bump changes in package.json, package-lock.json, and README.md, uncommitted English guide modal changes in README.md, src/client/App.tsx, and src/client/styles.css, plus unrelated pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, and docs/analysis-data-debugging.md.",
+    "Branch main is ahead of origin/main by 3 commits, including 9732da7.",
+    "Browser behavior QA passed, but screenshot evidence could not be captured because Browser tab.screenshot timed out on CDP Page.captureScreenshot.",
     "The running service uses .env PORT=8200, not the README default 8080.",
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
     {
+      "id": "2026-05-26T22:43:18+08:00-config-version-0.3.0",
+      "at": "2026-05-26T22:43:18+08:00",
+      "kind": "config",
+      "summary": "Bumped the app version from 0.2.0 to 0.3.0 in package metadata and README, and verified the rebuilt live homepage shows v0.3.0.",
+      "verification": "npm run typecheck; npm test; git diff --check -- package.json package-lock.json README.md src/client/App.tsx src/client/styles.css .ai/status.json; npm run build; restart launchd service on PORT=8200; curl health; Browser DOM verification at 1089x964, 1280x900, 1710x1021, and 390x844"
+    },
+    {
+      "id": "2026-05-26T22:39:46+08:00-code-speed-guide-modal-english",
+      "at": "2026-05-26T22:39:46+08:00",
+      "kind": "code",
+      "summary": "Added a topbar `Speed Guide` button and English speed-test reference modal with detailed collection, stability, latency, reliability, and Wired/Wi-Fi threshold explanations.",
+      "verification": "npm run typecheck; npm test; git diff --check -- src/client/App.tsx src/client/styles.css README.md .ai/status.json; npm run build; restart launchd service on PORT=8200; curl health; Browser DOM/interaction QA at 1089x964, 1280x900, 1710x1021, and 390x844; Browser screenshot capture unavailable"
+    },
+    {
       "id": "2026-05-26T21:40:53+08:00-code-iqr-kept-card-detail",
       "at": "2026-05-26T21:40:53+08:00",
       "kind": "code",
       "summary": "Changed throughput detail cards from P75 Upper and Samples kept to P75 / Q3 and IQR kept with outlier-rate detail, while keeping P25/Q1 as a documented IQR concept only.",
+      "commit": "9732da7",
       "verification": "npm test -- test/throughput-display.test.ts; npm run typecheck; npm test; npm run build; restart launchd service on PORT=8200; curl health; Browser Download/Upload modal QA at 1089x964, 1280x900, 1710x1021, and 390x844"
     },
     {
@@ -65,20 +80,6 @@
       "summary": "Committed and pushed the fixed-height warning carousel, marquee behavior, README verification updates, and status snapshot to origin/main.",
       "commit": "2a313e0",
       "verification": "git fetch origin main; git diff --cached --check; git commit 2a313e0; git push -u origin main"
-    },
-    {
-      "id": "2026-05-26T14:09:38+08:00-code-warning-carousel-fixed-marquee",
-      "at": "2026-05-26T14:09:38+08:00",
-      "kind": "code",
-      "summary": "Converted homepage warnings to fixed-height cards with shortened one-line copy and overflow-only marquee behavior while preserving carousel controls, 2-second auto-rotation, hover/focus pause, and red hotspot title styling.",
-      "verification": "npm run typecheck; npm test; git diff --check for changed UI/status files; npm run build; restart npm start on PORT=8200; curl health; Browser viewport QA at 1191x964, 1089x964, 1280x900, 1710x1021, and 390x844"
-    },
-    {
-      "id": "2026-05-26T13:56:36+08:00-code-warning-carousel-auto-rotate",
-      "at": "2026-05-26T13:56:36+08:00",
-      "kind": "code",
-      "summary": "Added 2-second automatic warning carousel rotation, hover/focus pause handling, and red title styling for the mobile hotspot warning.",
-      "verification": "npm run typecheck; npm test; git diff --check for changed UI files; npm run build; restart npm start on PORT=8200; curl health; Browser warning carousel QA at 1191x964"
     }
   ]
 }

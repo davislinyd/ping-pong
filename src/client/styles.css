@@ -140,6 +140,16 @@ button.version-pill {
   cursor: default;
 }
 
+.guide-pill {
+  color: #0e7490;
+}
+
+.guide-pill:hover,
+.guide-pill:focus-visible {
+  border-color: #a5d8e7;
+  background: #eef9fc;
+}
+
 .server-pill svg {
   flex: 0 0 auto;
 }
@@ -1085,6 +1095,153 @@ button.version-pill {
   --tone: #0f766e;
   gap: 16px;
   width: min(1040px, calc(100vw - 32px));
+}
+
+.speed-guide-modal {
+  --tone: #0e7490;
+  gap: 18px;
+  width: min(820px, calc(100vw - 32px));
+}
+
+.speed-guide-modal .metric-modal-title strong {
+  font-size: 1.55rem;
+  line-height: 1.16;
+}
+
+.speed-guide-modal .metric-modal-title em {
+  display: inline-block;
+  margin-top: 7px;
+  color: #64717d;
+  font-size: 0.84rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.speed-guide-content {
+  display: grid;
+  gap: 16px;
+}
+
+.speed-guide-section {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.speed-guide-section h2,
+.speed-guide-section h3 {
+  margin: 0;
+  color: #101418;
+  line-height: 1.2;
+}
+
+.speed-guide-section h2 {
+  font-size: 1rem;
+}
+
+.speed-guide-section h3 {
+  font-size: 0.87rem;
+}
+
+.speed-guide-section p,
+.speed-guide-section li {
+  color: #48535d;
+  font-size: 0.92rem;
+  line-height: 1.58;
+}
+
+.speed-guide-grid,
+.speed-guide-tables,
+.speed-guide-compare {
+  display: grid;
+  gap: 10px;
+}
+
+.speed-guide-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.speed-guide-tables,
+.speed-guide-compare {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.speed-guide-tile,
+.speed-guide-table-block,
+.speed-guide-compare > div,
+.speed-guide-note {
+  min-width: 0;
+  border: 1px solid #edf2f6;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.speed-guide-tile,
+.speed-guide-table-block,
+.speed-guide-compare > div {
+  padding: 12px;
+}
+
+.speed-guide-note {
+  padding: 14px;
+}
+
+.speed-guide-tile span {
+  display: block;
+  color: #64717d;
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.speed-guide-tile strong {
+  display: block;
+  margin-top: 6px;
+  color: #101418;
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.speed-guide-tile em {
+  display: block;
+  margin-top: 6px;
+  color: #64717d;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.speed-guide-threshold-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  color: #334155;
+  font-size: 0.84rem;
+}
+
+.speed-guide-threshold-table th,
+.speed-guide-threshold-table td {
+  border-top: 1px solid #edf2f6;
+  padding: 7px 0;
+  text-align: left;
+}
+
+.speed-guide-threshold-table th {
+  color: #101418;
+  font-weight: 900;
+}
+
+.speed-guide-threshold-table td {
+  color: #48535d;
+  font-weight: 800;
+}
+
+.speed-guide-compare ul {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding-left: 18px;
 }
 
 .raw-data-modal .metric-modal-title strong {
@@ -2393,6 +2550,16 @@ button.server-pill {
 
   .raw-data-modal {
     width: min(100%, 560px);
+  }
+
+  .speed-guide-modal {
+    width: min(100%, 560px);
+  }
+
+  .speed-guide-grid,
+  .speed-guide-tables,
+  .speed-guide-compare {
+    grid-template-columns: 1fr;
   }
 
   .raw-data-header-actions {
