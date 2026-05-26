@@ -1,5 +1,5 @@
-import type { ResultPayload, RuntimeConfigResponse } from "../shared/contracts";
-import type { TestProgress } from "./speed-test-core";
+import type { RuntimeConfigResponse } from "../shared/contracts";
+import type { SpeedTestRunResult, TestProgress } from "./speed-test-core";
 import type { SpeedTestWorkerMessage, SpeedTestWorkerRequest } from "./speed-test-worker-protocol";
 
 export type SpeedTestWorkerLike = {
@@ -10,7 +10,7 @@ export type SpeedTestWorkerLike = {
 };
 
 export type RunningSpeedTestWorker = {
-  promise: Promise<ResultPayload>;
+  promise: Promise<SpeedTestRunResult>;
   terminate: () => void;
 };
 
@@ -32,7 +32,7 @@ export function startSpeedTestWorker(
     rejectPromise(new DOMException("Speed test timed out", "TimeoutError"));
   }, timeoutMs);
 
-  const promise = new Promise<ResultPayload>((resolve, reject) => {
+  const promise = new Promise<SpeedTestRunResult>((resolve, reject) => {
     rejectPromise = reject;
 
     cleanup = () => {
@@ -60,7 +60,7 @@ export function startSpeedTestWorker(
       }
 
       if (message.type === "complete") {
-        settle(() => resolve(message.result));
+        settle(() => resolve({ result: message.result, rawData: message.rawData }));
         return;
       }
 

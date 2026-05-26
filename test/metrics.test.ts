@@ -4,6 +4,8 @@ import { DEFAULT_CAT_SPEED_RANGES, catSpeedStageForMbps, normalizeCatSpeedRanges
 import {
   bytesToMegabits,
   bytesToMbps,
+  classifyLatencySamples,
+  classifyThroughputSamples,
   coefficientOfVariation,
   filterIqrOutliers,
   jitter,
@@ -124,6 +126,43 @@ describe("metric helpers", () => {
       cvPercent: 0,
       sampleCount: 9,
       filteredSampleCount: 7
+    });
+  });
+
+  it("classifies startup and IQR-excluded throughput samples", () => {
+    const samples = [5, 100, 0, 100, 100, 100, 100, 100, 100, 1000].map((mbps) => ({
+      bytes: mbps * 125_000,
+      elapsedMs: 1000
+    }));
+
+    const classified = classifyThroughputSamples(samples);
+
+    expect(classified[0]).toMatchObject({
+      sampleIndex: 1,
+      mbps: 5,
+      status: "startup-excluded",
+      excludedFrom: ["Stable Mean", "Stable CV", "Raw CV", "P10/P50/P75/P90"]
+    });
+    expect(classified.filter((sample) => sample.status === "iqr-excluded").map((sample) => sample.mbps)).toEqual([0, 1000]);
+    expect(classified.filter((sample) => sample.status === "used")).toHaveLength(7);
+  });
+
+  it("classifies failed and IQR-excluded latency samples", () => {
+    const classified = classifyLatencySamples([10, 11, 12, 13, 14, 15, 16, 17, 18, 1000, null], "Loaded Latency Median");
+
+    expect(classified[9]).toMatchObject({
+      sampleIndex: 10,
+      ms: 1000,
+      status: "iqr-excluded",
+      usedIn: ["HTTP Loss"],
+      excludedFrom: ["Loaded Latency Median"]
+    });
+    expect(classified[10]).toMatchObject({
+      sampleIndex: 11,
+      ms: null,
+      status: "failed",
+      usedIn: ["HTTP Loss"],
+      excludedFrom: ["Loaded Latency Median"]
     });
   });
 

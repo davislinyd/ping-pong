@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LOCAL_THROTTLE, type ResultPayload, type RuntimeConfigResponse, type ThroughputStats } from "../src/shared/contracts";
 import { isSpeedTestWorkerAbort, startSpeedTestWorker, type SpeedTestWorkerLike } from "../src/client/speed-test-worker-client";
 import type { SpeedTestWorkerMessage, SpeedTestWorkerRequest } from "../src/client/speed-test-worker-protocol";
-import type { TestProgress } from "../src/client/speed-test-core";
+import type { RawTestData, TestProgress } from "../src/client/speed-test-core";
 
 describe("speed test worker client", () => {
   afterEach(() => {
@@ -15,15 +15,16 @@ describe("speed test worker client", () => {
     const progress: TestProgress[] = [];
     const config = baseConfig();
     const result = baseResult();
+    const rawData = baseRawData();
 
     const run = startSpeedTestWorker(config, (next) => progress.push(next), () => worker);
 
     expect(worker.messages).toEqual([{ type: "start", config }]);
 
     worker.emitMessage({ type: "progress", progress: { phase: "download", label: "Download", progressPercent: 25 } });
-    worker.emitMessage({ type: "complete", result });
+    worker.emitMessage({ type: "complete", result, rawData });
 
-    await expect(run.promise).resolves.toEqual(result);
+    await expect(run.promise).resolves.toEqual({ result, rawData });
     expect(progress).toEqual([{ phase: "download", label: "Download", progressPercent: 25 }]);
 
     run.terminate();
@@ -46,7 +47,7 @@ describe("speed test worker client", () => {
 
     run.terminate();
     worker.emitMessage({ type: "progress", progress: { phase: "upload", label: "Upload", progressPercent: 50 } });
-    worker.emitMessage({ type: "complete", result: baseResult({ downloadMbps: 1 }) });
+    worker.emitMessage({ type: "complete", result: baseResult({ downloadMbps: 1 }), rawData: baseRawData() });
 
     await run.promise.then(
       () => {
@@ -100,13 +101,14 @@ describe("speed test worker client", () => {
     vi.useFakeTimers();
     const worker = new FakeWorker();
     const result = baseResult({ durationSeconds: 20 });
+    const rawData = baseRawData();
     const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 20 }), () => undefined, () => worker);
 
     await vi.advanceTimersByTimeAsync(59_000);
-    worker.emitMessage({ type: "complete", result });
+    worker.emitMessage({ type: "complete", result, rawData });
     await vi.advanceTimersByTimeAsync(1_000);
 
-    await expect(run.promise).resolves.toEqual(result);
+    await expect(run.promise).resolves.toEqual({ result, rawData });
   });
 });
 
@@ -196,6 +198,16 @@ function baseResult(patch: Partial<ResultPayload> = {}): ResultPayload {
     networkLinkType: "unknown",
     testProfile: "standard",
     ...patch
+  };
+}
+
+function baseRawData(): RawTestData {
+  return {
+    downloadThroughput: [{ bytes: 1_000_000, elapsedMs: 1000 }],
+    uploadThroughput: [{ bytes: 900_000, elapsedMs: 1000 }],
+    idleLatency: [4],
+    downloadLoadedLatency: [22],
+    uploadLoadedLatency: [24]
   };
 }
 

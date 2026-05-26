@@ -21,6 +21,30 @@ export type ThroughputSample = {
   elapsedMs: number;
 };
 
+export type ThroughputSampleStatus = "used" | "startup-excluded" | "iqr-excluded";
+
+export type ClassifiedThroughputSample = {
+  sampleIndex: number;
+  bytes: number;
+  elapsedMs: number;
+  mbps: number;
+  status: ThroughputSampleStatus;
+  reason: string;
+  usedIn: string[];
+  excludedFrom: string[];
+};
+
+export type LatencySampleStatus = "used" | "iqr-excluded" | "failed";
+
+export type ClassifiedLatencySample = {
+  sampleIndex: number;
+  ms: number | null;
+  status: LatencySampleStatus;
+  reason: string;
+  usedIn: string[];
+  excludedFrom: string[];
+};
+
 export function steadyMbpsFromSamples(samples: ThroughputSample[], fallbackBytes: number, fallbackElapsedMs: number): number {
   return throughputStatsFromSamples(samples, fallbackBytes, fallbackElapsedMs).meanMbps;
 }
@@ -54,6 +78,86 @@ export function startupDiscardCount(sampleCount: number): number {
   return Math.min(sampleCount - 1, Math.max(1, Math.ceil(sampleCount * 0.03)));
 }
 
+export function classifyThroughputSamples(samples: ThroughputSample[]): ClassifiedThroughputSample[] {
+  const records = samples.map((sample, index) => ({
+    sampleIndex: index + 1,
+    bytes: sample.bytes,
+    elapsedMs: sample.elapsedMs,
+    mbps: bytesToMbps(sample.bytes, sample.elapsedMs)
+  }));
+  const discardCount = startupDiscardCount(records.length);
+  const steadyRecords = records.slice(discardCount);
+  const bounds = iqrBounds(steadyRecords.map((sample) => sample.mbps));
+
+  return records.map((sample, index) => {
+    if (index < discardCount) {
+      return {
+        ...sample,
+        status: "startup-excluded",
+        reason: "Startup trim",
+        usedIn: ["Raw data"],
+        excludedFrom: ["Stable Mean", "Stable CV", "Raw CV", "P10/P50/P75/P90"]
+      };
+    }
+
+    if (bounds && (sample.mbps < bounds.lower || sample.mbps > bounds.upper)) {
+      return {
+        ...sample,
+        status: "iqr-excluded",
+        reason: "IQR outlier",
+        usedIn: ["Raw CV", "P10/P50/P75/P90"],
+        excludedFrom: ["Stable Mean", "Stable CV"]
+      };
+    }
+
+    return {
+      ...sample,
+      status: "used",
+      reason: "Included",
+      usedIn: ["Stable Mean", "Stable CV", "Raw CV", "P10/P50/P75/P90"],
+      excludedFrom: []
+    };
+  });
+}
+
+export function classifyLatencySamples(samples: Array<number | null>, medianLabel: string): ClassifiedLatencySample[] {
+  const finite = samples.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const bounds = iqrBounds(finite);
+
+  return samples.map((sample, index) => {
+    if (typeof sample !== "number" || !Number.isFinite(sample)) {
+      return {
+        sampleIndex: index + 1,
+        ms: null,
+        status: "failed",
+        reason: "Request failed",
+        usedIn: ["HTTP Loss"],
+        excludedFrom: [medianLabel]
+      };
+    }
+
+    if (bounds && (sample < bounds.lower || sample > bounds.upper)) {
+      return {
+        sampleIndex: index + 1,
+        ms: sample,
+        status: "iqr-excluded",
+        reason: "IQR outlier",
+        usedIn: ["HTTP Loss"],
+        excludedFrom: [medianLabel]
+      };
+    }
+
+    return {
+      sampleIndex: index + 1,
+      ms: sample,
+      status: "used",
+      reason: "Included",
+      usedIn: [medianLabel, "HTTP Loss"],
+      excludedFrom: []
+    };
+  });
+}
+
 export function percentile(values: number[], targetPercentile: number): number {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (sorted.length === 0) return 0;
@@ -74,13 +178,22 @@ export function quartiles(values: number[]): { q1: number; q3: number; iqr: numb
   return { q1, q3, iqr: q3 - q1 };
 }
 
+function iqrBounds(values: number[]): { lower: number; upper: number } | null {
+  const finite = values.filter(Number.isFinite);
+  if (finite.length < 4) return null;
+  const { q1, q3, iqr } = quartiles(finite);
+  return {
+    lower: q1 - 1.5 * iqr,
+    upper: q3 + 1.5 * iqr
+  };
+}
+
 export function filterIqrOutliers(values: number[]): number[] {
   const finite = values.filter(Number.isFinite);
   if (finite.length < 4) return finite;
-  const { q1, q3, iqr } = quartiles(finite);
-  const lower = q1 - 1.5 * iqr;
-  const upper = q3 + 1.5 * iqr;
-  return finite.filter((value) => value >= lower && value <= upper);
+  const bounds = iqrBounds(finite);
+  if (!bounds) return finite;
+  return finite.filter((value) => value >= bounds.lower && value <= bounds.upper);
 }
 
 export function standardDeviation(values: number[]): number {

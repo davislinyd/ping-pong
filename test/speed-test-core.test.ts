@@ -102,7 +102,7 @@ describe("runSpeedTest", () => {
 
   it("returns a ResultPayload with the correct shape and value ranges", async () => {
     stubFetch();
-    const result = await runSpeedTest(testConfig, () => {}, new AbortController().signal);
+    const { result } = await runSpeedTest(testConfig, () => {}, new AbortController().signal);
 
     expect(result.durationSeconds).toBe(testConfig.defaultTestDurationSeconds);
     expect(result.parallelConnections).toBe(testConfig.parallelConnections);
@@ -118,9 +118,20 @@ describe("runSpeedTest", () => {
     expect(result.uploadStats.sampleCount).toBeGreaterThanOrEqual(0);
   }, 10_000);
 
+  it("returns raw throughput and latency attempts with the summarized result", async () => {
+    stubFetch({ failLatency: true });
+    const runResult = await runSpeedTest(testConfig, () => {}, new AbortController().signal);
+
+    expect(runResult.result.httpLossPercent).toBeGreaterThan(0);
+    expect(runResult.rawData.downloadThroughput.length).toBeGreaterThan(0);
+    expect(runResult.rawData.uploadThroughput.length).toBeGreaterThan(0);
+    expect(runResult.rawData.idleLatency).toContain(null);
+    expect(runResult.rawData.downloadLoadedLatency.length + runResult.rawData.uploadLoadedLatency.length).toBeGreaterThan(0);
+  }, 10_000);
+
   it("reports non-zero HTTP loss when latency calls fail", async () => {
     stubFetch({ failLatency: true });
-    const result = await runSpeedTest(testConfig, () => {}, new AbortController().signal);
+    const { result } = await runSpeedTest(testConfig, () => {}, new AbortController().signal);
     expect(result.httpLossPercent).toBeGreaterThan(0);
   }, 10_000);
 
@@ -165,7 +176,7 @@ describe("runSpeedTest", () => {
       })
     );
 
-    const result = await runSpeedTest({ ...testConfig, parallelConnections: 3 }, () => {}, new AbortController().signal);
+    const { result } = await runSpeedTest({ ...testConfig, parallelConnections: 3 }, () => {}, new AbortController().signal);
 
     expect(result.parallelConnections).toBe(3);
     expect(result.testProfile).toBe("standard");
@@ -196,7 +207,7 @@ describe("runSpeedTest", () => {
       })
     );
 
-    const result = await runSpeedTest(
+    const { result } = await runSpeedTest(
       {
         ...testConfig,
         parallelConnections: 4,

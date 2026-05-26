@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { type NetworkLinkType, type ResultPayload, type RuntimeConfigResponse, type ThroughputStats } from "../../shared/contracts";
-import { createEmptyMetricSeries, type MetricSeries, type TestPhase, type TestProgress } from "../speed-test-core";
+import { createEmptyMetricSeries, type MetricSeries, type RawTestData, type TestPhase, type TestProgress } from "../speed-test-core";
 import { isSpeedTestWorkerAbort, startSpeedTestWorker, type RunningSpeedTestWorker } from "../speed-test-worker-client";
 
 export type SpeedTestHook = {
@@ -11,6 +11,7 @@ export type SpeedTestHook = {
   currentMbps: number | null;
   progressPercent: number;
   metricSeries: MetricSeries;
+  rawData: RawTestData | null;
   transferMegabits: { download: number; upload: number };
   error: string | null;
   setError: (error: string | null) => void;
@@ -54,6 +55,7 @@ export function useSpeedTest(): SpeedTestHook {
   const [currentMbps, setCurrentMbps] = useState<number | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [metricSeries, setMetricSeries] = useState<MetricSeries>(() => createEmptyMetricSeries());
+  const [rawData, setRawData] = useState<RawTestData | null>(null);
   const [transferMegabits, setTransferMegabits] = useState({ download: 0, upload: 0 });
   const [error, setError] = useState<string | null>(null);
   const workerRunRef = useRef<RunningSpeedTestWorker | null>(null);
@@ -87,6 +89,7 @@ export function useSpeedTest(): SpeedTestHook {
     setCurrentMbps(null);
     setProgressPercent(0);
     setMetricSeries(createEmptyMetricSeries());
+    setRawData(null);
     setTransferMegabits({ download: 0, upload: 0 });
 
     let latestTransfer = { download: 0, upload: 0 };
@@ -109,12 +112,14 @@ export function useSpeedTest(): SpeedTestHook {
     workerRunRef.current = workerRun;
 
     try {
-      const measured = await workerRun.promise;
+      const runResult = await workerRun.promise;
+      const measured = runResult.result;
       workerRun.terminate();
       if (workerRunRef.current === workerRun) workerRunRef.current = null;
       if (testRunIdRef.current === runId) {
         const measuredWithLinkType = { ...measured, networkLinkType };
         setResult(measuredWithLinkType);
+        setRawData(runResult.rawData);
         setTransferMegabits({ ...latestTransfer });
         setProgressPercent(100);
         return { measured: measuredWithLinkType, runId };
@@ -134,6 +139,7 @@ export function useSpeedTest(): SpeedTestHook {
     currentMbps,
     progressPercent,
     metricSeries,
+    rawData,
     transferMegabits,
     error,
     setError,

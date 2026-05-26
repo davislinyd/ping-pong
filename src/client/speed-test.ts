@@ -10,7 +10,7 @@ import {
 } from "../shared/contracts";
 
 export { createEmptyMetricSeries } from "./speed-test-core";
-export type { MetricSeries, TestPhase, TestProgress } from "./speed-test-core";
+export type { MetricSeries, RawTestData, TestPhase, TestProgress } from "./speed-test-core";
 
 const BROWSER_CLIENT_STORAGE_KEY = "ping-pong.browserClientId";
 const BROWSER_CLIENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

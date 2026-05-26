@@ -24,8 +24,22 @@ export type TestProgress = {
   series?: Partial<MetricSeries>;
 };
 
+export type RawTestData = {
+  downloadThroughput: ThroughputSample[];
+  uploadThroughput: ThroughputSample[];
+  idleLatency: Array<number | null>;
+  downloadLoadedLatency: Array<number | null>;
+  uploadLoadedLatency: Array<number | null>;
+};
+
+export type SpeedTestRunResult = {
+  result: ResultPayload;
+  rawData: RawTestData;
+};
+
 type LatencySet = {
   samples: number[];
+  attempts: Array<number | null>;
   sent: number;
   failed: number;
 };
@@ -51,7 +65,7 @@ export async function runSpeedTest(
   config: RuntimeConfigResponse,
   onProgress: (progress: TestProgress) => void,
   signal: AbortSignal
-): Promise<ResultPayload> {
+): Promise<SpeedTestRunResult> {
   const series = createEmptyMetricSeries();
   let latencySent = 0;
   let latencyFailed = 0;
@@ -182,15 +196,25 @@ export async function runSpeedTest(
     partial: result,
     series: cloneMetricSeries(series)
   });
-  return result;
+  return {
+    result,
+    rawData: {
+      downloadThroughput: [...download.throughputSamples],
+      uploadThroughput: [...upload.throughputSamples],
+      idleLatency: [...idleLatency.attempts],
+      downloadLoadedLatency: [...download.loadedLatency.attempts],
+      uploadLoadedLatency: [...upload.loadedLatency.attempts]
+    }
+  };
 }
 
 async function latencySamples(count: number, signal: AbortSignal, onSample?: (sample: number | null, completed: number, total: number) => void): Promise<LatencySet> {
-  const result: LatencySet = { samples: [], sent: 0, failed: 0 };
+  const result: LatencySet = { samples: [], attempts: [], sent: 0, failed: 0 };
 
   for (let index = 0; index < count; index += 1) {
     const sample = await latencyOnce(signal);
     result.sent += 1;
+    result.attempts.push(sample);
     if (sample === null) {
       result.failed += 1;
     } else {
@@ -204,11 +228,12 @@ async function latencySamples(count: number, signal: AbortSignal, onSample?: (sa
 }
 
 async function collectLoadedLatency(stopAt: number, signal: AbortSignal, onSample?: (sample: number | null) => void): Promise<LatencySet> {
-  const result: LatencySet = { samples: [], sent: 0, failed: 0 };
+  const result: LatencySet = { samples: [], attempts: [], sent: 0, failed: 0 };
 
   while (performance.now() < stopAt && !signal.aborted) {
     const sample = await latencyOnce(signal);
     result.sent += 1;
+    result.attempts.push(sample);
     if (sample === null) {
       result.failed += 1;
     } else {
@@ -244,7 +269,7 @@ async function measureDownload(
   onPhaseProgress?: (phaseProgress: number) => void,
   onLoadedLatencySample?: (sample: number | null) => void,
   onMegabits?: (megabits: number) => void
-): Promise<{ mbps: number; megabits: number; stats: ThroughputStats; loadedLatency: LatencySet }> {
+): Promise<{ mbps: number; megabits: number; stats: ThroughputStats; throughputSamples: ThroughputSample[]; loadedLatency: LatencySet }> {
   const durationMs = config.defaultTestDurationSeconds * 1000;
   const startedAt = performance.now();
   const warmupUntil = startedAt + Math.min(WARMUP_MS, durationMs / 3);
@@ -304,7 +329,7 @@ async function measureDownload(
   onPhaseProgress?.(1);
   onMegabits?.(megabits);
 
-  return { mbps, megabits, stats, loadedLatency };
+  return { mbps, megabits, stats, throughputSamples: [...throughputSamples], loadedLatency };
 }
 
 async function measureUpload(
@@ -314,7 +339,7 @@ async function measureUpload(
   onPhaseProgress?: (phaseProgress: number) => void,
   onLoadedLatencySample?: (sample: number | null) => void,
   onMegabits?: (megabits: number) => void
-): Promise<{ mbps: number; megabits: number; stats: ThroughputStats; loadedLatency: LatencySet }> {
+): Promise<{ mbps: number; megabits: number; stats: ThroughputStats; throughputSamples: ThroughputSample[]; loadedLatency: LatencySet }> {
   const durationMs = config.defaultTestDurationSeconds * 1000;
   const startedAt = performance.now();
   const warmupUntil = startedAt + Math.min(WARMUP_MS, durationMs / 3);
@@ -378,7 +403,7 @@ async function measureUpload(
   onPhaseProgress?.(1);
   onMegabits?.(megabits);
 
-  return { mbps, megabits, stats, loadedLatency };
+  return { mbps, megabits, stats, throughputSamples: [...throughputSamples], loadedLatency };
 }
 
 function createThroughputSampler(

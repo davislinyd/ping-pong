@@ -4,6 +4,7 @@ import {
   ArrowUp,
   Cable,
   Clock3,
+  Database,
   FileText,
   Image,
   Loader2,
@@ -34,9 +35,11 @@ import {
   loadReportContext,
   loadRuntimeConfig,
   saveResult,
+  type RawTestData,
   type TestPhase
 } from "./speed-test";
 import { AdminConsole } from "./AdminConsole";
+import { buildRawDataRows, downloadRawDataCsv, summarizeRawDataRows, type RawDataRow } from "./raw-data";
 import { buildCompletionSummary, type CompletionSummary } from "./result-summary";
 import { buildReportSnapshot, downloadReport, type ReportFormat } from "./report-export";
 import { isSpeedTestWorkerAbort } from "./speed-test-worker-client";
@@ -77,6 +80,7 @@ function SpeedTestApp() {
   const [reportBusyFormat, setReportBusyFormat] = useState<ReportFormat | null>(null);
   const [selectedMetricLabel, setSelectedMetricLabel] = useState<string | null>(null);
   const [selectedHistoryResult, setSelectedHistoryResult] = useState<SavedResult | null>(null);
+  const [rawDataOpen, setRawDataOpen] = useState(false);
   const [selectedNetworkLinkType, setSelectedNetworkLinkType] = useState<SelectableNetworkLinkType | null>(null);
   const [selectedTestDurationSeconds, setSelectedTestDurationSeconds] = useState<TestDurationSeconds>(DEFAULT_TEST_DURATION_SECONDS);
   const [connectionContext, setConnectionContext] = useState<ConnectionContextState>({ status: "loading", context: null });
@@ -87,7 +91,7 @@ function SpeedTestApp() {
   const speedTest = useSpeedTest();
   const session = useActiveSession();
 
-  const { phase, result, currentMbps, progressPercent, metricSeries, transferMegabits, error, isRunning } = speedTest;
+  const { phase, result, currentMbps, progressPercent, metricSeries, rawData, transferMegabits, error, isRunning } = speedTest;
   const { activeStatus } = session;
 
   const isSpeedPhase = phase === "download" || phase === "upload";
@@ -118,18 +122,19 @@ function SpeedTestApp() {
   }, []);
 
   useEffect(() => {
-    if (!selectedMetricLabel && !selectedHistoryResult) return;
+    if (!selectedMetricLabel && !selectedHistoryResult && !rawDataOpen) return;
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setSelectedMetricLabel(null);
         setSelectedHistoryResult(null);
+        setRawDataOpen(false);
       }
     }
 
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedMetricLabel, selectedHistoryResult]);
+  }, [selectedMetricLabel, selectedHistoryResult, rawDataOpen]);
 
   const metrics = useMemo<Metric[]>(
     () => [
@@ -195,6 +200,7 @@ function SpeedTestApp() {
     speedTest.setError(null);
     setLastSavedResult(null);
     setReportError(null);
+    setRawDataOpen(false);
 
     let sessionId: string | null = null;
     try {
@@ -296,6 +302,14 @@ function SpeedTestApp() {
 
       <div className="dashboard-shell">
         <div className="notice-stack">
+          <section className="hotspot-warning" role="status" aria-live="polite">
+            <TriangleAlert size={20} />
+            <div>
+              <strong>Mobile hotspot data warning</strong>
+              <p>Running this test through a phone hotspot can generate high traffic and may consume your mobile data plan.</p>
+            </div>
+          </section>
+
           {localClientWarning ? (
             <section className="local-warning" role="status" aria-live="polite">
               <TriangleAlert size={20} />
@@ -376,7 +390,13 @@ function SpeedTestApp() {
                 </button>
 
                 {phase === "complete" && lastSavedResult ? (
-                  <ReportActions busyFormat={reportBusyFormat} error={reportError} onDownload={(format) => void downloadCurrentReport(format)} />
+                  <ReportActions
+                    busyFormat={reportBusyFormat}
+                    error={reportError}
+                    rawDataAvailable={rawData !== null}
+                    onDownload={(format) => void downloadCurrentReport(format)}
+                    onOpenRawData={() => setRawDataOpen(true)}
+                  />
                 ) : null}
 
                 <div className="primary-metrics" aria-label="Speed metrics">
@@ -418,6 +438,7 @@ function SpeedTestApp() {
 
       {selectedMetric ? <MetricDetailModal metric={selectedMetric} onClose={() => setSelectedMetricLabel(null)} /> : null}
       {selectedHistoryResult ? <HistoryDetailModal result={selectedHistoryResult} onClose={() => setSelectedHistoryResult(null)} /> : null}
+      {rawDataOpen && lastSavedResult && rawData ? <RawDataModal result={lastSavedResult} rawData={rawData} onClose={() => setRawDataOpen(false)} /> : null}
     </main>
   );
 
@@ -621,9 +642,21 @@ function TestDurationSelector({
   );
 }
 
-function ReportActions({ busyFormat, error, onDownload }: { busyFormat: ReportFormat | null; error: string | null; onDownload: (format: ReportFormat) => void }) {
+function ReportActions({
+  busyFormat,
+  error,
+  rawDataAvailable,
+  onDownload,
+  onOpenRawData
+}: {
+  busyFormat: ReportFormat | null;
+  error: string | null;
+  rawDataAvailable: boolean;
+  onDownload: (format: ReportFormat) => void;
+  onOpenRawData: () => void;
+}) {
   return (
-    <div className="report-actions" aria-label="Download IT diagnostic report">
+    <div className="report-actions" aria-label="Completed test actions">
       <div className="report-actions-row">
         <button className="report-action-button" type="button" disabled={busyFormat !== null} onClick={() => onDownload("html")}>
           {busyFormat === "html" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
@@ -636,6 +669,10 @@ function ReportActions({ busyFormat, error, onDownload }: { busyFormat: ReportFo
         <button className="report-action-button" type="button" disabled={busyFormat !== null} onClick={() => onDownload("markdown")}>
           {busyFormat === "markdown" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
           <span>Markdown</span>
+        </button>
+        <button className="report-action-button" type="button" disabled={!rawDataAvailable || busyFormat !== null} onClick={onOpenRawData}>
+          <Database size={16} />
+          <span>Raw Data</span>
         </button>
       </div>
       {error ? <p className="report-error" role="status">{error}</p> : null}
@@ -730,6 +767,104 @@ function HistoryDetailModal({ result, onClose }: { result: SavedResult; onClose:
   );
 }
 
+function RawDataModal({ result, rawData, onClose }: { result: SavedResult; rawData: RawTestData; onClose: () => void }) {
+  const rows = useMemo(() => buildRawDataRows(rawData, result), [rawData, result]);
+  const groups = useMemo(() => ["All", ...Array.from(new Set(rows.map((row) => row.group)))], [rows]);
+  const [selectedGroup, setSelectedGroup] = useState("All");
+  const visibleRows = selectedGroup === "All" ? rows : rows.filter((row) => row.group === selectedGroup);
+  const summary = useMemo(() => summarizeRawDataRows(rows), [rows]);
+
+  return (
+    <div className="metric-modal-backdrop" onMouseDown={onClose}>
+      <section className="metric-modal raw-data-modal" role="dialog" aria-modal="true" aria-label="Raw test data" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="metric-modal-header">
+          <div className="metric-modal-title">
+            <Database size={22} strokeWidth={2.2} />
+            <div>
+              <span>Raw Test Data</span>
+              <strong>{formatDateTime(result.createdAt)}</strong>
+              <em>{summary.used}/{summary.total} samples used</em>
+            </div>
+          </div>
+          <div className="raw-data-header-actions">
+            <button className="report-action-button raw-data-download" type="button" onClick={() => downloadRawDataCsv(rows, result.createdAt)}>
+              <ArrowDown size={16} />
+              <span>CSV</span>
+            </button>
+            <button className="metric-modal-close" type="button" aria-label="Close raw data" onClick={onClose}>
+              <X size={20} strokeWidth={2.2} />
+            </button>
+          </div>
+        </div>
+
+        <div className="raw-data-summary" aria-label="Raw data usage summary">
+          <RawDataSummaryTile label="Total samples" value={summary.total} />
+          <RawDataSummaryTile label="Used" value={summary.used} />
+          <RawDataSummaryTile label="Excluded or failed" value={summary.excluded} />
+        </div>
+
+        <div className="raw-data-tabs" aria-label="Raw data groups">
+          {groups.map((group) => (
+            <button className={`raw-data-tab${selectedGroup === group ? " is-selected" : ""}`} type="button" aria-pressed={selectedGroup === group} key={group} onClick={() => setSelectedGroup(group)}>
+              {group}
+            </button>
+          ))}
+        </div>
+
+        <div className="raw-data-table-shell">
+          <table className="raw-data-table">
+            <thead>
+              <tr>
+                <th scope="col">Group</th>
+                <th scope="col">Sample</th>
+                <th scope="col">Value</th>
+                <th scope="col">Status</th>
+                <th scope="col">Used in</th>
+                <th scope="col">Excluded from</th>
+                <th scope="col">Transfer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row) => (
+                <RawDataTableRow row={row} key={`${row.group}-${row.sample_index}`} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function RawDataSummaryTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="raw-data-summary-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function RawDataTableRow({ row }: { row: RawDataRow }) {
+  const transfer = row.bytes ? `${row.bytes} bytes / ${row.elapsed_ms} ms` : "n/a";
+  return (
+    <tr>
+      <td>{row.group}</td>
+      <td>{row.sample_index}</td>
+      <td>
+        <strong>{row.value || "Failed"}</strong> <span>{row.unit}</span>
+      </td>
+      <td>
+        <span className={`raw-data-status raw-data-status-${row.status}`}>{rawDataStatusLabel(row.status)}</span>
+        <em>{row.reason}</em>
+      </td>
+      <td>{row.used_in || "n/a"}</td>
+      <td>{row.excluded_from || "n/a"}</td>
+      <td>{transfer}</td>
+    </tr>
+  );
+}
+
 function HistoryDetailTile({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <div className="history-detail-tile">
@@ -738,6 +873,13 @@ function HistoryDetailTile({ label, value, unit }: { label: string; value: strin
       {unit ? <em>{unit}</em> : null}
     </div>
   );
+}
+
+function rawDataStatusLabel(status: string): string {
+  if (status === "startup-excluded") return "Startup excluded";
+  if (status === "iqr-excluded") return "IQR excluded";
+  if (status === "failed") return "Failed";
+  return "Used";
 }
 
 function HistoryStatsPanel({ title, stats }: { title: string; stats: ThroughputStats }) {
