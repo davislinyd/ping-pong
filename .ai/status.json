@@ -1,19 +1,19 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-26T21:21:26+08:00",
+  "last_updated": "2026-05-26T21:40:53+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
-  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, current-run Raw Data popup/CSV diagnostics, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Implemented link-aware Completion Summary stability judging: Wired and Unknown keep strict worst-grade thresholds, while Wi-Fi uses a usability-aware profile that keeps raw throughput diagnostics intact but avoids labeling usable variable Wi-Fi as unstable.",
-  "next_action": "Review and commit the Wi-Fi stability summary logic, regression tests, README and whitepaper updates, and refreshed status snapshot; keep unrelated dirty files out of that commit.",
+  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
+  "latest_summary": "Updated throughput detail cards to keep the 8-tile layout while renaming P75 Upper to P75 / Q3 and replacing Samples kept with IQR kept plus outlier-rate detail. P25/Q1 remains documented as an IQR calculation concept without adding API, DB, or payload fields.",
+  "next_action": "Review and commit the throughput detail card display helper, tests, README and whitepaper updates, and refreshed status snapshot; keep unrelated dirty files out of that commit.",
   "git": {
     "branch": "main",
     "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "ef7ed47"
+    "commit": "f138669"
   },
   "verification": {
     "status": "passed",
@@ -23,31 +23,39 @@
       "git remote -v",
       "npm run typecheck",
       "npm test",
-      "npm test -- test/result-summary.test.ts",
-      "git diff --check -- src/client/result-summary.ts test/result-summary.test.ts README.md docs/speed-test-statistics-whitepaper.md",
+      "npm test -- test/throughput-display.test.ts",
+      "git diff --check -- src/client/App.tsx src/client/throughput-display.ts test/throughput-display.test.ts README.md docs/speed-test-statistics-whitepaper.md",
       "npm run build",
       "launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest",
       "lsof -nP -iTCP:8200 -sTCP:LISTEN",
       "curl -fsS http://127.0.0.1:8200/api/health",
       "curl -fsS http://127.0.0.1:8200/ | head -20",
-      "Browser Wi-Fi homepage smoke QA at 1089x964, 1280x900, 1710x1021, and 390x844"
+      "Browser Download/Upload metric modal QA at 1089x964, 1280x900, 1710x1021, and 390x844"
     ],
-    "last_verified_at": "2026-05-26T21:21:26+08:00",
-    "notes": "Wi-Fi stability summary verification passed. Focused result-summary tests, typecheck, whitespace diff check, full Vitest suite (94 tests), and production build passed. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser QA confirmed page identity, Quick 20s and Full 30s controls, Wi-Fi selection, Start enabled after link selection, no horizontal overflow, no console warnings/errors, one-screen desktop height at 1089x964, 1280x900, and 1710x1021, and reachable vertical mobile layout at 390x844. Browser screenshots were saved under /tmp/ping-pong-wifi-stability-*.png."
+    "last_verified_at": "2026-05-26T21:40:53+08:00",
+    "notes": "Throughput detail card verification passed. The new iqrKeptDisplay helper passed focused tests for 82/97, 97/97, and 0/0 cases; typecheck, whitespace diff check, full Vitest suite (97 tests), and production build passed. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser QA confirmed Download and Upload detail modals show P75 / Q3, IQR kept, and 0% outliers at 1089x964, 1280x900, 1710x1021, and 390x844 with no horizontal overflow and no console warnings/errors. Browser screenshots were saved under /tmp/ping-pong-iqr-kept-*.png."
   },
   "attention": [
-    "Current Wi-Fi stability summary changes are uncommitted in README.md, docs/speed-test-statistics-whitepaper.md, src/client/result-summary.ts, test/result-summary.test.ts, and .ai/status.json.",
+    "Current throughput detail card changes are uncommitted in README.md, docs/speed-test-statistics-whitepaper.md, src/client/App.tsx, src/client/throughput-display.ts, test/throughput-display.test.ts, and .ai/status.json.",
     "Working tree also remains dirty because of unrelated pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, and docs/analysis-data-debugging.md.",
-    "Branch main is ahead of origin/main by 1 commit (ef7ed47).",
+    "Branch main is ahead of origin/main by 2 commits, including f138669.",
     "The running service uses .env PORT=8200, not the README default 8080.",
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
     {
+      "id": "2026-05-26T21:40:53+08:00-code-iqr-kept-card-detail",
+      "at": "2026-05-26T21:40:53+08:00",
+      "kind": "code",
+      "summary": "Changed throughput detail cards from P75 Upper and Samples kept to P75 / Q3 and IQR kept with outlier-rate detail, while keeping P25/Q1 as a documented IQR concept only.",
+      "verification": "npm test -- test/throughput-display.test.ts; npm run typecheck; npm test; npm run build; restart launchd service on PORT=8200; curl health; Browser Download/Upload modal QA at 1089x964, 1280x900, 1710x1021, and 390x844"
+    },
+    {
       "id": "2026-05-26T21:21:26+08:00-code-wifi-stability-profile",
       "at": "2026-05-26T21:21:26+08:00",
       "kind": "code",
       "summary": "Added link-aware Completion Summary stability judging so Wi-Fi uses a usability-aware profile while Wired and Unknown keep strict worst-grade behavior.",
+      "commit": "f138669",
       "verification": "npm test -- test/result-summary.test.ts; npm run typecheck; npm test; npm run build; restart launchd service on PORT=8200; curl health; Browser Wi-Fi homepage QA at 1089x964, 1280x900, 1710x1021, and 390x844"
     },
     {
@@ -71,13 +79,6 @@
       "kind": "code",
       "summary": "Added 2-second automatic warning carousel rotation, hover/focus pause handling, and red title styling for the mobile hotspot warning.",
       "verification": "npm run typecheck; npm test; git diff --check for changed UI files; npm run build; restart npm start on PORT=8200; curl health; Browser warning carousel QA at 1191x964"
-    },
-    {
-      "id": "2026-05-26T13:44:37+08:00-code-warning-carousel-layout",
-      "at": "2026-05-26T13:44:37+08:00",
-      "kind": "code",
-      "summary": "Changed homepage warnings into a single carousel card with a top-right count and tightened desktop primary metric cards so Download/Upload do not overlap secondary metrics.",
-      "verification": "npm run typecheck; npm test; git diff --check for changed UI files; npm run build; restart npm start on PORT=8200; curl health; Browser viewport QA at 1089x964, 1280x900, 1710x1021, and 390x844"
     }
   ]
 }

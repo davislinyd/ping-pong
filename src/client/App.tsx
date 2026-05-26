@@ -45,6 +45,7 @@ import { buildRawDataRows, downloadRawDataCsv, summarizeRawDataRows, type RawDat
 import { buildCompletionSummary, type CompletionSummary } from "./result-summary";
 import { buildReportSnapshot, downloadReport, type ReportFormat } from "./report-export";
 import { isSpeedTestWorkerAbort } from "./speed-test-worker-client";
+import { iqrKeptDisplay } from "./throughput-display";
 import { useActiveSession } from "./hooks/useActiveSession";
 import { useSpeedTest } from "./hooks/useSpeedTest";
 
@@ -1194,12 +1195,14 @@ function MetricStatsStrip({ stats }: { stats: ThroughputStats }) {
 }
 
 function MetricStatsPanel({ stats }: { stats: ThroughputStats }) {
+  const iqrKept = iqrKeptDisplay(stats);
+
   return (
     <div className="metric-stats-panel" aria-label="Throughput percentile summary">
       <StatTile label="Stable Mean" value={stats.meanMbps} />
       <StatTile label="P10 Low" value={stats.p10Mbps} />
       <StatTile label="P50 Typical" value={stats.p50Mbps} />
-      <StatTile label="P75 Upper" value={stats.p75Mbps} />
+      <StatTile label="P75 / Q3" value={stats.p75Mbps} />
       <StatTile label="P90 High" value={stats.p90Mbps} />
       <div className="metric-stat-tile">
         <span>Raw CV</span>
@@ -1210,10 +1213,9 @@ function MetricStatsPanel({ stats }: { stats: ThroughputStats }) {
         <strong>{formatNumber(stats.cvPercent)}%</strong>
       </div>
       <div className="metric-stat-tile">
-        <span>Samples kept</span>
-        <strong>
-          {stats.filteredSampleCount}/{stats.sampleCount}
-        </strong>
+        <span>IQR kept</span>
+        <strong>{iqrKept.value}</strong>
+        <em>{iqrKept.detail}</em>
       </div>
     </div>
   );
