@@ -165,43 +165,60 @@ button.version-pill {
   background: #fff1f1;
 }
 
-.hotspot-warning,
-.local-warning,
-.capacity-warning {
+.notice-card {
+  position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
+  height: 64px;
+  overflow: hidden;
   border: 1px solid #f7c56b;
   border-radius: 8px;
-  padding: 10px 16px;
+  padding: 0 112px 0 16px;
   background: #fff8e8;
   color: #7a4d05;
 }
 
-.capacity-warning {
+.notice-card-capacity {
   background: #fff8e8;
 }
 
-.capacity-warning.is-full {
+.notice-card-capacity.is-full {
   border-color: #f4a3a3;
   background: #fff1f1;
   color: #8f1d1d;
 }
 
-.hotspot-warning svg,
-.local-warning svg,
-.capacity-warning svg {
+.notice-card > svg {
   flex: 0 0 auto;
-  margin-top: 2px;
 }
 
-.hotspot-warning strong,
-.local-warning strong,
-.capacity-warning strong {
+.notice-content {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  width: 100%;
+}
+
+.notice-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.notice-title-row strong {
   display: block;
-  margin-bottom: 3px;
+  min-width: 0;
   color: #5f3a03;
   font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-card-hotspot .notice-title-row strong {
+  color: #b42318;
 }
 
 .local-throttle-badge,
@@ -223,17 +240,106 @@ button.version-pill {
   margin: 2px 0 6px;
 }
 
-.hotspot-warning p,
-.local-warning p,
-.capacity-warning p {
+.notice-title-row .local-throttle-badge {
+  flex: 0 0 auto;
+  min-height: 20px;
+  margin: 0;
+  padding: 0 8px;
+  font-size: 0.68rem;
+}
+
+.notice-message {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   color: #7a4d05;
   font-size: 0.9rem;
   line-height: 1.34;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.capacity-warning.is-full strong,
-.capacity-warning.is-full p {
+.notice-message-text {
+  display: inline-block;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.notice-message.is-marquee {
+  text-overflow: clip;
+}
+
+.notice-message.is-marquee .notice-message-text {
+  animation: notice-marquee var(--notice-marquee-duration, 8s) linear infinite alternate;
+  will-change: transform;
+}
+
+.notice-card:hover .notice-message.is-marquee .notice-message-text,
+.notice-card:focus-within .notice-message.is-marquee .notice-message-text {
+  animation-play-state: paused;
+}
+
+.notice-card-capacity.is-full strong,
+.notice-card-capacity.is-full .notice-message {
   color: #8f1d1d;
+}
+
+.notice-carousel-controls {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.notice-index {
+  min-width: 36px;
+  color: #7a4d05;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 24px;
+  text-align: center;
+}
+
+.notice-step-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #f7c56b;
+  border-radius: 999px;
+  padding: 0;
+  background: #fffdf4;
+  color: #7a4d05;
+  cursor: pointer;
+}
+
+.notice-step-button:hover {
+  border-color: #d6962f;
+  background: #fff4d6;
+}
+
+.notice-step-button:focus-visible {
+  outline: 3px solid rgba(180, 119, 23, 0.22);
+  outline-offset: 2px;
+}
+
+@keyframes notice-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(calc(-1 * var(--notice-marquee-distance, 0px)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice-message.is-marquee .notice-message-text {
+    animation: none;
+  }
 }
 
 .test-panel {
@@ -252,7 +358,7 @@ button.version-pill {
 .test-panel-main {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: stretch;
+  align-items: start;
   gap: 14px;
   min-height: 0;
 }
@@ -261,7 +367,7 @@ button.version-pill {
   display: grid;
   align-content: center;
   justify-items: center;
-  min-height: 0;
+  min-height: 360px;
   border: 1px solid #d9e1e8;
   border-radius: 8px;
   padding: 18px;
@@ -477,7 +583,7 @@ button.version-pill {
   display: grid;
   align-content: start;
   gap: 8px;
-  min-height: 0;
+  min-height: auto;
   border: 1px solid #edf2f6;
   border-radius: 8px;
   padding: 12px;
@@ -822,6 +928,36 @@ button.version-pill {
 
 .metric-card-secondary .metric-card-value strong {
   font-size: 1.42rem;
+}
+
+@media (min-width: 981px) {
+  .transfer-summary-item {
+    padding: 7px 10px;
+  }
+
+  .transfer-summary-item strong {
+    margin-top: 4px;
+    font-size: 1.1rem;
+  }
+
+  .metric-card-primary {
+    gap: 6px;
+    min-height: 128px;
+    padding: 10px;
+  }
+
+  .metric-card-primary .metric-card-value strong {
+    font-size: 1.55rem;
+  }
+
+  .metric-card-primary .metric-stats-strip span {
+    padding: 3px 4px;
+    font-size: 0.58rem;
+  }
+
+  .metric-card-primary .metric-sparkline {
+    height: 22px;
+  }
 }
 
 .metric-label {
@@ -2029,16 +2165,17 @@ button.server-pill {
     display: block;
   }
 
-.hotspot-warning,
-.local-warning,
-.capacity-warning {
+  .notice-card {
+    height: 72px;
     margin-top: 24px;
-    padding: 14px 16px;
+    padding: 0 16px;
   }
 
-  .hotspot-warning p,
-  .local-warning p,
-  .capacity-warning p {
+  .notice-content {
+    padding-right: 94px;
+  }
+
+  .notice-message {
     font-size: 0.93rem;
     line-height: 1.45;
   }

@@ -1,19 +1,19 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-26T12:52:35+08:00",
+  "last_updated": "2026-05-26T14:09:38+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
-  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, stability-first completion summaries, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible project documentation.",
-  "latest_summary": "Implemented automatic Local throttled profile handling for allowed local self-tests. /api/config now advertises a localThrottle profile only for local clients that can run tests; worker runs use one connection, smaller payloads, and 32 Mbps pacing; saved results persist testProfile through validation, SQLite, Recent Results, completion summaries, and IT reports. A short desktop-height overlap that blocked Start was fixed by allowing natural page height below 821px.",
-  "next_action": "Push the local self-test throttling commit to origin/main when ready. Separately decide whether the pre-existing .gitignore, AGENTS.md, deleted Ping-Pong project docx, untracked HTML specification, and docs/analysis-data-debugging.md changes are intentional.",
+  "current_goal": "Maintain the single-node intranet speed-test service with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, current-run Raw Data popup/CSV diagnostics, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
+  "latest_summary": "Changed homepage warnings to a fixed-height carousel with shortened one-line copy and marquee animation only when message text overflows. Desktop/tablet warnings stay 64px tall, mobile warnings stay 72px tall, carousel auto-rotation and hover/focus pause remain active, and the hotspot title remains red.",
+  "next_action": "Review and commit the fixed-height warning carousel, marquee behavior, auto-rotation, hotspot title color, and desktop metric-card layout fix when ready, then push local commits to origin/main if desired. Separately decide whether the pre-existing .gitignore, AGENTS.md, deleted Ping-Pong project docx, untracked HTML specification, docs/analysis-data-debugging.md, and docs/speed-test-statistics-whitepaper.md changes are intentional.",
   "git": {
     "branch": "main",
     "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "19804fa"
+    "commit": "d662085"
   },
   "verification": {
     "status": "passed",
@@ -21,54 +21,62 @@
       "git rev-parse --is-inside-work-tree",
       "git status --short --branch",
       "git remote -v",
-      "test -f .ai/status.json && sed -n '1,220p' .ai/status.json",
-      "npm test -- test/speed-test-core.test.ts test/api.test.ts test/report-export.test.ts test/speed-test-worker-client.test.ts test/result-summary.test.ts",
       "npm run typecheck",
       "npm test",
-      "git diff --check",
+      "git diff --check -- src/client/App.tsx src/client/styles.css README.md",
       "npm run build",
-      "launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest",
-      "lsof -nP -iTCP:8200 -sTCP:LISTEN",
-      "curl -fsS http://127.0.0.1:8200/api/health",
-      "curl -fsS http://127.0.0.1:8200/api/config",
-      "curl -fsS http://127.0.0.1:8200/api/active-tests",
-      "In-app Browser DOM verification loaded http://127.0.0.1:8200/ and confirmed Local throttled banner with no console errors/warnings; screenshot capture timed out and Start click was not reliable there",
-      "Playwright CLI opened http://127.0.0.1:8200/, selected Wi-Fi, ran Quick 20s, observed ~32 Mbps throttled download, reached Test Summary with Local throttled, opened Recent Result detail with Profile Local throttled, and reported zero warning/error console messages",
-      "rm -rf .playwright-cli"
+      "restart npm start for PORT=8200",
+      "curl -sS http://127.0.0.1:8200/api/health",
+      "Browser warning carousel QA at 1191x964, 1089x964, 1280x900, 1710x1021, and 390x844",
+      "python /Users/lindav/git/OctoPulse/tools/validate_status.py \"/Users/lindav/git/Ping Pong/.ai/status.json\""
     ],
-    "last_verified_at": "2026-05-26T12:45:25+08:00",
-    "notes": "Focused local-throttle tests passed with 5 files and 55 tests. Full typecheck passed, full Vitest passed with 8 files and 82 tests, git diff whitespace check passed, and production build passed. The LaunchAgent-backed service was restarted on .env port 8200; lsof confirmed node listening, health/config/active-tests checks returned successfully, and /api/config showed localThrottle active for localhost with 32 Mbps, 1 connection, 262144-byte download chunks, and 131072-byte upload bodies. In-app Browser confirmed the local throttled banner and clean console but its screenshot capture timed out and Start click was unreliable. Playwright CLI verification completed a localhost Quick 20s Wi-Fi run, observed throttled throughput around 32 Mbps during download, reached Test Summary with Local throttled, saved a Recent Result with Profile Local throttled, and reported zero warning/error console messages. A screenshot was copied to /tmp/ping-pong-qa/local-throttled-result-detail.png and transient .playwright-cli artifacts were removed. Browser verification remains a localhost local self-test, so real intranet performance still needs a separate non-local device run."
+    "last_verified_at": "2026-05-26T14:09:38+08:00",
+    "notes": "Homepage warning-carousel verification passed. Typecheck, full Vitest suite (87 tests), whitespace diff check, and production build passed. The PORT=8200 npm start service was restarted after the final build and /api/health returned ok. Browser QA confirmed page identity, nonblank content, no framework overlay, no console warnings/errors, fixed warning heights at 64px for 1191x964, 1089x964, 1280x900, and 1710x1021, fixed 72px warning height at 390x844, no Download/Jitter or Upload/HTTP Loss overlap, no warning-driven full-page height growth on desktop viewports, mobile vertical scroll remained reachable, hotspot title color computed as rgb(180, 35, 24), auto-rotation moved between 1/2 and 2/2 at about 2-second intervals, focus pause kept the selected warning stable after the next control received focus, and long mobile warning copy used .is-marquee without increasing card height. Browser screenshot capture timed out during evidence collection, so rendered QA evidence was DOM, computed style, console, and interaction state."
   },
   "attention": [
-    "Working tree remains dirty beyond the local self-test throttling implementation because of pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, and docs/analysis-data-debugging.md.",
-    ".ai/status.json will need a post-commit refresh with the resulting commit hash after this implementation is committed.",
-    "The branch is ahead of origin/main by 2 commits and has not been pushed.",
+    "Working tree remains dirty beyond .ai/status.json because of the fixed-height warning carousel/marquee/layout fix in README.md, src/client/App.tsx, and src/client/styles.css, plus pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, docs/analysis-data-debugging.md, and docs/speed-test-statistics-whitepaper.md.",
+    ".ai/status.json was refreshed after the UI verification and is intentionally uncommitted as the current delivery-state snapshot.",
+    "The branch is ahead of origin/main by 4 commits and has not been pushed.",
     "The running service uses .env PORT=8200, not the README default 8080.",
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
     {
-      "id": "2026-05-26T12:45:25+08:00-code-local-throttle",
-      "at": "2026-05-26T12:45:25+08:00",
+      "id": "2026-05-26T14:09:38+08:00-code-warning-carousel-fixed-marquee",
+      "at": "2026-05-26T14:09:38+08:00",
       "kind": "code",
-      "summary": "Implemented automatic Local throttled profile handling so allowed localhost maintenance tests use capped traffic and are labeled across UI, storage, and reports.",
-      "verification": "npm test focused local-throttle files; npm run typecheck; npm test; git diff --check; npm run build; launchctl restart; curl health/config/active-tests; Playwright CLI Quick 20s local-throttled run completed and opened Recent Result detail with Profile Local throttled"
+      "summary": "Converted homepage warnings to fixed-height cards with shortened one-line copy and overflow-only marquee behavior while preserving carousel controls, 2-second auto-rotation, hover/focus pause, and red hotspot title styling.",
+      "verification": "npm run typecheck; npm test; git diff --check for changed UI/status files; npm run build; restart npm start on PORT=8200; curl health; Browser viewport QA at 1191x964, 1089x964, 1280x900, 1710x1021, and 390x844"
     },
     {
-      "id": "2026-05-26T12:03:41+08:00-commit-19804fa",
-      "at": "2026-05-26T12:03:41+08:00",
+      "id": "2026-05-26T13:56:36+08:00-code-warning-carousel-auto-rotate",
+      "at": "2026-05-26T13:56:36+08:00",
+      "kind": "code",
+      "summary": "Added 2-second automatic warning carousel rotation, hover/focus pause handling, and red title styling for the mobile hotspot warning.",
+      "verification": "npm run typecheck; npm test; git diff --check for changed UI files; npm run build; restart npm start on PORT=8200; curl health; Browser warning carousel QA at 1191x964"
+    },
+    {
+      "id": "2026-05-26T13:44:37+08:00-code-warning-carousel-layout",
+      "at": "2026-05-26T13:44:37+08:00",
+      "kind": "code",
+      "summary": "Changed homepage warnings into a single carousel card with a top-right count and tightened desktop primary metric cards so Download/Upload do not overlap secondary metrics.",
+      "verification": "npm run typecheck; npm test; git diff --check for changed UI files; npm run build; restart npm start on PORT=8200; curl health; Browser viewport QA at 1089x964, 1280x900, 1710x1021, and 390x844"
+    },
+    {
+      "id": "2026-05-26T13:35:03+08:00-docs-speed-test-whitepaper",
+      "at": "2026-05-26T13:35:03+08:00",
+      "kind": "docs",
+      "summary": "Added a reusable Traditional Chinese speed-test statistics whitepaper with current sampling logic, statistical definitions, stability grading, limitations, glossary, and two complete 100-sample worked examples.",
+      "commit": "d662085",
+      "verification": "Node recalculation of whitepaper sample table and documented statistics; git diff --check for docs/speed-test-statistics-whitepaper.md; heading and line-count inspection"
+    },
+    {
+      "id": "2026-05-26T13:32:04+08:00-commit-d662085",
+      "at": "2026-05-26T13:32:04+08:00",
       "kind": "commit",
-      "summary": "Committed the speed-test worker timeout fix so Quick 20s and Full 30s runs no longer time out before upload completes.",
-      "commit": "19804fa",
-      "verification": "git commit 19804fa; npm test -- test/speed-test-worker-client.test.ts; npm run typecheck; npm test; npm run build; launchctl restart; curl health/active-tests; in-app browser Quick 20s completed without timeout; git diff --check; status JSON parse; OctoPulse validate_status"
-    },
-    {
-      "id": "2026-05-26T10:36:04+08:00-code-4baba95",
-      "at": "2026-05-26T10:36:04+08:00",
-      "kind": "code",
-      "summary": "Implemented Quick 20s/Full 30s homepage modes, proportional throughput trimming, raw CV diagnostics, stricter stability grading, rawCvPercent API/SQLite support, report/README updates, and responsive QA fix.",
-      "commit": "4baba95",
-      "verification": "npm run typecheck; npm test; npm run build; git diff --check; launchctl restart; curl health/report/home/recent; in-app browser QA at 1089x964, 1280x900, 1710x1021, 390x844, 768x1024"
+      "summary": "Committed the current-run Raw Data popup/CSV export, hotspot data-plan warning, and v0.2.0 version bump.",
+      "commit": "d662085",
+      "verification": "git diff --cached --check; git commit d662085 after focused/full tests, typecheck, build, service restart, curl endpoint checks, Browser viewport QA, and Playwright Raw Data CSV/dismiss checks"
     }
   ]
 }

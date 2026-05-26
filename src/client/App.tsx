@@ -3,6 +3,8 @@ import {
   ArrowDown,
   ArrowUp,
   Cable,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Database,
   FileText,
@@ -47,6 +49,7 @@ import { useActiveSession } from "./hooks/useActiveSession";
 import { useSpeedTest } from "./hooks/useSpeedTest";
 
 type MetricTone = "teal" | "amber" | "blue" | "rose" | "ink" | "green";
+type WarningNoticeKind = "hotspot" | "local" | "capacity";
 type SelectableNetworkLinkType = Exclude<NetworkLinkType, "unknown">;
 type ConnectionContextState = {
   status: "loading" | "ready" | "unavailable";
@@ -64,6 +67,15 @@ type Metric = {
   tone: MetricTone;
   series: number[];
   stats?: ThroughputStats;
+};
+type WarningNotice = {
+  key: WarningNoticeKind;
+  kind: WarningNoticeKind;
+  title: string;
+  message: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  badge?: string;
+  isFull?: boolean;
 };
 
 declare const __APP_VERSION__: string;
@@ -85,6 +97,7 @@ function SpeedTestApp() {
   const [selectedTestDurationSeconds, setSelectedTestDurationSeconds] = useState<TestDurationSeconds>(DEFAULT_TEST_DURATION_SECONDS);
   const [connectionContext, setConnectionContext] = useState<ConnectionContextState>({ status: "loading", context: null });
   const [isDeletingRecent, setIsDeletingRecent] = useState(false);
+  const [activeNoticeIndex, setActiveNoticeIndex] = useState(0);
   const adminEntryClickCountRef = useRef(0);
   const adminEntryResetTimerRef = useRef<number | null>(null);
 
@@ -108,6 +121,45 @@ function SpeedTestApp() {
   const mainReadoutTone: MetricTone = phase === "upload" ? "amber" : "teal";
   const mainReadoutSeries = phase === "upload" ? metricSeries.uploadMbps : metricSeries.downloadMbps;
   const completionSummary = useMemo(() => buildCompletionSummary(result, config?.catSpeedRanges), [config?.catSpeedRanges, result]);
+  const warningNotices = useMemo<WarningNotice[]>(() => {
+    const notices: WarningNotice[] = [
+      {
+        key: "hotspot",
+        kind: "hotspot",
+        title: "Mobile hotspot data warning",
+        message: "Hotspot testing may use significant mobile data.",
+        icon: TriangleAlert
+      }
+    ];
+
+    if (localClientWarning) {
+      notices.push({
+        key: "local",
+        kind: "local",
+        title: "Local self-test detected",
+        message: `Local self-test only; open from another device for real intranet results.${
+          localThrottleActive ? ` Traffic capped at ${config?.localThrottle.maxMbps} Mbps for maintenance.` : ""
+        }`,
+        icon: TriangleAlert,
+        badge: localThrottleActive ? "Local throttled" : undefined
+      });
+    }
+
+    if (concurrencyWarning) {
+      notices.push({
+        key: "capacity",
+        kind: "capacity",
+        title: concurrencyFull ? "Test capacity is full" : "Multiple active tests detected",
+        message: concurrencyFull
+          ? `All ${activeStatus.maxActiveTests} test slots are in use; try again after another test finishes.`
+          : `${activeTests} active tests may affect results until they finish.`,
+        icon: UsersRound,
+        isFull: concurrencyFull
+      });
+    }
+
+    return notices;
+  }, [activeStatus.maxActiveTests, activeTests, concurrencyFull, concurrencyWarning, config?.localThrottle.maxMbps, localClientWarning, localThrottleActive]);
 
   useEffect(() => {
     void Promise.all([loadRuntimeConfig(), loadRecentResults(), refreshConnectionContext()])
@@ -135,6 +187,10 @@ function SpeedTestApp() {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [selectedMetricLabel, selectedHistoryResult, rawDataOpen]);
+
+  useEffect(() => {
+    setActiveNoticeIndex((index) => Math.min(index, Math.max(warningNotices.length - 1, 0)));
+  }, [warningNotices.length]);
 
   const metrics = useMemo<Metric[]>(
     () => [
@@ -302,39 +358,7 @@ function SpeedTestApp() {
 
       <div className="dashboard-shell">
         <div className="notice-stack">
-          <section className="hotspot-warning" role="status" aria-live="polite">
-            <TriangleAlert size={20} />
-            <div>
-              <strong>Mobile hotspot data warning</strong>
-              <p>Running this test through a phone hotspot can generate high traffic and may consume your mobile data plan.</p>
-            </div>
-          </section>
-
-          {localClientWarning ? (
-            <section className="local-warning" role="status" aria-live="polite">
-              <TriangleAlert size={20} />
-              <div>
-                <strong>Local self-test detected</strong>
-                {localThrottleActive ? <span className="local-throttle-badge">Local throttled</span> : null}
-                <p>{localClientWarning} Open this page from another device to run a valid intranet speed test.</p>
-                {localThrottleActive ? <p>Local maintenance traffic is capped at {config?.localThrottle.maxMbps} Mbps so this browser tab can finish the test.</p> : null}
-              </div>
-            </section>
-          ) : null}
-
-          {concurrencyWarning ? (
-            <section className={`capacity-warning${concurrencyFull ? " is-full" : ""}`} role="status" aria-live="polite">
-              <UsersRound size={20} />
-              <div>
-                <strong>{concurrencyFull ? "Test capacity is full" : "Multiple active tests detected"}</strong>
-                <p>
-                  {concurrencyFull
-                    ? `All ${activeStatus.maxActiveTests} speed-test slots are in use. Try again after another test finishes.`
-                    : `${activeTests} people are testing now. Results may affect each other until active tests finish.`}
-                </p>
-              </div>
-            </section>
-          ) : null}
+          <WarningCarousel notices={warningNotices} activeIndex={activeNoticeIndex} onSelect={setActiveNoticeIndex} />
         </div>
 
         <div className="dashboard-stack">
@@ -677,6 +701,117 @@ function ReportActions({
       </div>
       {error ? <p className="report-error" role="status">{error}</p> : null}
     </div>
+  );
+}
+
+function WarningCarousel({ notices, activeIndex, onSelect }: { notices: WarningNotice[]; activeIndex: number; onSelect: (index: number) => void }) {
+  const noticeCardRef = useRef<HTMLElement | null>(null);
+  const messageFrameRef = useRef<HTMLParagraphElement | null>(null);
+  const messageTextRef = useRef<HTMLSpanElement | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [marqueeDistance, setMarqueeDistance] = useState(0);
+
+  const currentIndex = Math.min(activeIndex, notices.length - 1);
+  const notice = notices[currentIndex];
+  const hasMultiple = notices.length > 1;
+  const countLabel = `${currentIndex + 1}/${notices.length}`;
+  const marqueeStyle = {
+    "--notice-marquee-distance": `${marqueeDistance}px`,
+    "--notice-marquee-duration": `${Math.max(6, Math.round(marqueeDistance / 20))}s`
+  } as React.CSSProperties;
+
+  function selectPrevious() {
+    onSelect((currentIndex + notices.length - 1) % notices.length);
+  }
+
+  function selectNext() {
+    onSelect((currentIndex + 1) % notices.length);
+  }
+
+  useEffect(() => {
+    if (!hasMultiple || isPaused) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      if (noticeCardRef.current?.matches(":hover, :focus-within")) {
+        return;
+      }
+      onSelect((currentIndex + 1) % notices.length);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [currentIndex, hasMultiple, isPaused, notices.length, onSelect]);
+
+  useEffect(() => {
+    const frame = messageFrameRef.current;
+    const text = messageTextRef.current;
+    if (!frame || !text) {
+      setMarqueeDistance(0);
+      return;
+    }
+    const frameElement = frame;
+    const textElement = text;
+
+    function updateMarqueeDistance() {
+      setMarqueeDistance(Math.max(0, Math.ceil(textElement.scrollWidth - frameElement.clientWidth + 18)));
+    }
+
+    updateMarqueeDistance();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateMarqueeDistance);
+      return () => window.removeEventListener("resize", updateMarqueeDistance);
+    }
+
+    const observer = new ResizeObserver(updateMarqueeDistance);
+    observer.observe(frameElement);
+    observer.observe(textElement);
+    return () => observer.disconnect();
+  }, [notice.message]);
+
+  if (notices.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      ref={noticeCardRef}
+      className={`notice-card notice-card-${notice.kind}${notice.isFull ? " is-full" : ""}`}
+      role="status"
+      aria-live="polite"
+      aria-label={`${notice.title}, ${countLabel}`}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocus={() => setIsPaused(true)}
+      onBlur={() => setIsPaused(false)}
+    >
+      <notice.icon size={20} />
+      <div className="notice-content">
+        <div className="notice-title-row">
+          <strong>{notice.title}</strong>
+          {notice.badge ? <span className="local-throttle-badge">{notice.badge}</span> : null}
+        </div>
+        <p ref={messageFrameRef} className={`notice-message${marqueeDistance > 0 ? " is-marquee" : ""}`} style={marqueeStyle}>
+          <span ref={messageTextRef} className="notice-message-text">
+            {notice.message}
+          </span>
+        </p>
+      </div>
+      <div className="notice-carousel-controls" aria-label="Warning carousel">
+        {hasMultiple ? (
+          <button className="notice-step-button" type="button" aria-label="Previous warning" onClick={selectPrevious}>
+            <ChevronLeft size={16} strokeWidth={2.4} />
+          </button>
+        ) : null}
+        <span className="notice-index" aria-label={`Warning ${countLabel}`}>
+          {countLabel}
+        </span>
+        {hasMultiple ? (
+          <button className="notice-step-button" type="button" aria-label="Next warning" onClick={selectNext}>
+            <ChevronRight size={16} strokeWidth={2.4} />
+          </button>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
