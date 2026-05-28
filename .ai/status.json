@@ -1,14 +1,14 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-28T16:00:00+08:00",
+  "last_updated": "2026-05-28T19:30:00+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
   "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.1 with browser-scoped Recent Results, fixed homepage Quick 30s and Full 45s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries graded on Stable CV with loosened IQR outlier thresholds, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Synced the statistics whitepaper with the new shared usability-aware stability profile (Stable CV as main signal, widened IQR-outlier thresholds, P10<50 hard-poor only with present variability), updated example interpretations, refreshed test-duration mentions to 30s/45s, and replaced history.md with a pointer to .ai/status.json.",
-  "next_action": "Review and commit the doc-sync updates in `docs/speed-test-statistics-whitepaper.md`, `history.md`, and `.ai/status.json`.",
+  "latest_summary": "Repointed git origin from git@git.insea.io:lindav/ping-pong.git to https://git.insea.io/twn-general/ping-pong.git so the repo lives under the twn-general namespace.",
+  "next_action": "Create the empty `twn-general/ping-pong` project on git.insea.io, then push main to the new origin.",
   "git": {
     "branch": "main",
     "dirty": true,
@@ -43,6 +43,13 @@
   ],
   "recent_changes": [
     {
+      "id": "2026-05-28T19:30:00+08:00-ops-remote-url-change",
+      "at": "2026-05-28T19:30:00+08:00",
+      "kind": "ops",
+      "summary": "Repointed git origin to https://git.insea.io/twn-general/ping-pong.git so the repo moves under the twn-general namespace. Push deferred until the new project exists on git.insea.io.",
+      "verification": "git remote set-url origin ...; git remote -v"
+    },
+    {
       "id": "2026-05-28T16:00:00+08:00-docs-whitepaper-sync",
       "at": "2026-05-28T16:00:00+08:00",
       "kind": "docs",
@@ -70,13 +77,6 @@
       "kind": "code",
       "summary": "Stability now grades on Stable CV with looser IQR-outlier thresholds; homepage Quick/Full modes extended from 20s/30s to 30s/45s.",
       "verification": "npm run typecheck; npm test (98 passed); npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl -fsS http://127.0.0.1:8200/api/health; Browser QA at 1710x1021 and 1089x964 (Speed Guide thresholds and Quick 30s/Full 45s buttons confirmed)"
-    },
-    {
-      "id": "2026-05-28T14:05:36+08:00-code-layout-scroll-fallback",
-      "at": "2026-05-28T14:05:36+08:00",
-      "kind": "code",
-      "summary": "Added a rendered-height fallback so desktop keeps one-screen mode only when the homepage fits and otherwise scrolls instead of overlapping cards.",
-      "verification": "npm run typecheck; npm test; npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl -fsS http://127.0.0.1:8200/api/health; Browser QA at 1089x964, 1280x900, 1710x1021, and 1280x760"
     }
   ]
 }
