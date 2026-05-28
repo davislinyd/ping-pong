@@ -1,19 +1,19 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-26T22:43:18+08:00",
+  "last_updated": "2026-05-28T13:17:16+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
   "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.0 with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Bumped the uncommitted app version from 0.2.0 to 0.3.0 in package metadata and README. The live rebuilt homepage now shows `v0.3.0` between `Speed Guide` and the hidden admin version pill behavior, with no visible `v0.2.0` remaining.",
-  "next_action": "Review and commit the version bump plus guide modal changes when ready, then decide whether to include, discard, or separately commit the unrelated dirty files before pushing main to origin/main.",
+  "latest_summary": "Prepared a maintenance metadata follow-up on top of 479bba0: ignore `.claude/`, remove the stale `PROJECT_STATUS.md` handoff rule from AGENTS, and refresh the repo status snapshot.",
+  "next_action": "Commit and push the staged `.ai/status.json`, `.gitignore`, and `AGENTS.md` changes, then decide whether to restore, delete, or replace the tracked project docx and whether the new HTML and debugging note should be versioned.",
   "git": {
     "branch": "main",
     "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "9732da7"
+    "commit": "479bba0"
   },
   "verification": {
     "status": "partial",
@@ -29,33 +29,36 @@
       "lsof -nP -iTCP:8200 -sTCP:LISTEN",
       "curl -fsS http://127.0.0.1:8200/api/health",
       "curl -fsS http://127.0.0.1:8200/ | head -20",
-      "Browser rendered v0.3.0 verification at 1089x964, 1280x900, 1710x1021, and 390x844"
+      "Browser rendered v0.3.0 verification at 1089x964, 1280x900, 1710x1021, and 390x844",
+      "git diff --cached --check",
+      "git commit -m \"Add speed guide and bump version\""
     ],
-    "last_verified_at": "2026-05-26T22:43:18+08:00",
-    "notes": "Version bump verification is partial only because Browser screenshot capture is unavailable in this session, so rendered verification used DOM and interaction proof. Typecheck, whitespace diff check, full Vitest suite (97 tests), and production build passed with package version 0.3.0. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser DOM QA confirmed the topbar order is `0/4 testing now | Speed Guide | v0.3.0`, no visible `v0.2.0` remains, there is only one `button.version-pill`, there is no horizontal overflow at 1089x964, 1280x900, 1710x1021, and 390x844, the hidden admin five-click entry still opens `/admin`, and console warnings/errors are empty."
+    "last_verified_at": "2026-05-28T13:17:16+08:00",
+    "notes": "Head commit 479bba0 still carries the last full runtime verification: partial only because Browser screenshot capture was unavailable, so rendered verification used DOM and interaction proof. Typecheck, whitespace diff check, full Vitest suite (97 tests), and production build passed with package version 0.3.0. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser DOM QA confirmed the topbar order is `0/4 testing now | Speed Guide | v0.3.0`, no visible `v0.2.0` remains, there is only one `button.version-pill`, there is no horizontal overflow at 1089x964, 1280x900, 1710x1021, and 390x844, the hidden admin five-click entry still opens `/admin`, and console warnings/errors are empty. The current staged follow-up changes are repository metadata and instructions only; they were inspected with Git diff before commit."
   },
   "attention": [
-    ".ai/status.json was refreshed after the uncommitted version bump and guide modal implementation and is intentionally uncommitted as the current delivery-state snapshot.",
-    "Working tree now includes uncommitted version bump changes in package.json, package-lock.json, and README.md, uncommitted English guide modal changes in README.md, src/client/App.tsx, and src/client/styles.css, plus unrelated pre-existing .gitignore and AGENTS.md edits, a deleted Ping-Pong project docx, untracked Ping-Pong-Project-Specification.html, and docs/analysis-data-debugging.md.",
-    "Branch main is ahead of origin/main by 3 commits, including 9732da7.",
+    ".ai/status.json is staged as a refreshed snapshot on top of commit 479bba0.",
+    "Working tree remains dirty because the staged `.gitignore` and `AGENTS.md` updates are accompanied by a deleted tracked project docx and two untracked documentation files: `Ping-Pong-Project-Specification.html` and `docs/analysis-data-debugging.md`.",
+    "The current branch tracks origin/main and was in sync with the remote before this staged metadata follow-up.",
     "Browser behavior QA passed, but screenshot evidence could not be captured because Browser tab.screenshot timed out on CDP Page.captureScreenshot.",
     "The running service uses .env PORT=8200, not the README default 8080.",
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
     {
-      "id": "2026-05-26T22:43:18+08:00-config-version-0.3.0",
-      "at": "2026-05-26T22:43:18+08:00",
-      "kind": "config",
-      "summary": "Bumped the app version from 0.2.0 to 0.3.0 in package metadata and README, and verified the rebuilt live homepage shows v0.3.0.",
-      "verification": "npm run typecheck; npm test; git diff --check -- package.json package-lock.json README.md src/client/App.tsx src/client/styles.css .ai/status.json; npm run build; restart launchd service on PORT=8200; curl health; Browser DOM verification at 1089x964, 1280x900, 1710x1021, and 390x844"
+      "id": "2026-05-28T13:17:16+08:00-status-metadata-followup",
+      "at": "2026-05-28T13:17:16+08:00",
+      "kind": "status",
+      "summary": "Staged a metadata follow-up to ignore `.claude/`, remove the stale `PROJECT_STATUS.md` AGENTS reference, and refresh the repo status snapshot.",
+      "verification": "git status --short --branch; git remote -v; git diff --cached -- .ai/status.json .gitignore AGENTS.md"
     },
     {
-      "id": "2026-05-26T22:39:46+08:00-code-speed-guide-modal-english",
-      "at": "2026-05-26T22:39:46+08:00",
-      "kind": "code",
-      "summary": "Added a topbar `Speed Guide` button and English speed-test reference modal with detailed collection, stability, latency, reliability, and Wired/Wi-Fi threshold explanations.",
-      "verification": "npm run typecheck; npm test; git diff --check -- src/client/App.tsx src/client/styles.css README.md .ai/status.json; npm run build; restart launchd service on PORT=8200; curl health; Browser DOM/interaction QA at 1089x964, 1280x900, 1710x1021, and 390x844; Browser screenshot capture unavailable"
+      "id": "2026-05-26T22:46:20+08:00-commit-479bba0",
+      "at": "2026-05-26T22:46:20+08:00",
+      "kind": "commit",
+      "summary": "Committed the English Speed Guide modal and v0.3.0 version bump.",
+      "commit": "479bba0",
+      "verification": "npm run typecheck; npm test; git diff --check -- package.json package-lock.json README.md src/client/App.tsx src/client/styles.css .ai/status.json; npm run build; restart launchd service on PORT=8200; curl health; Browser DOM/interaction QA at 1089x964, 1280x900, 1710x1021, and 390x844; git diff --cached --check; git commit 479bba0"
     },
     {
       "id": "2026-05-26T21:40:53+08:00-code-iqr-kept-card-detail",
