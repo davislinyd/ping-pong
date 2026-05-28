@@ -33,6 +33,15 @@ button {
   padding: 24px 0 18px;
 }
 
+.app-shell-scroll-safe {
+  height: auto;
+}
+
+.app-shell-scroll-safe .dashboard-shell,
+.app-shell-scroll-safe .dashboard-stack {
+  min-height: auto;
+}
+
 .dashboard-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

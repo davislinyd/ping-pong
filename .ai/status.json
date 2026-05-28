@@ -1,14 +1,14 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-28T13:27:59+08:00",
+  "last_updated": "2026-05-28T14:05:36+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
   "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.0 with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Pushed maintenance metadata commit 995d8ab to origin/main, then staged a documentation cleanup that removes the obsolete project spec files and starts tracking the analysis-data debugging note.",
-  "next_action": "Commit and push the staged `.ai/status.json`, tracked docx deletion, and new `docs/analysis-data-debugging.md` note.",
+  "latest_summary": "Added a viewport-overflow fallback so the homepage keeps one-screen desktop layout when it fits and switches to normal scrolling before cards overlap on shorter or zoomed viewports.",
+  "next_action": "Review and commit the homepage layout fallback updates in `src/client/App.tsx`, `src/client/styles.css`, `README.md`, and `.ai/status.json`.",
   "git": {
     "branch": "main",
     "dirty": true,
@@ -16,41 +16,37 @@
     "commit": "995d8ab"
   },
   "verification": {
-    "status": "partial",
+    "status": "verified",
     "last_commands": [
       "git rev-parse --is-inside-work-tree",
       "git status --short --branch",
       "git remote -v",
       "npm run typecheck",
       "npm test",
-      "git diff --check -- package.json package-lock.json README.md src/client/App.tsx src/client/styles.css .ai/status.json",
+      "git diff --check -- src/client/App.tsx src/client/styles.css",
       "npm run build",
       "launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest",
       "lsof -nP -iTCP:8200 -sTCP:LISTEN",
       "curl -fsS http://127.0.0.1:8200/api/health",
-      "curl -fsS http://127.0.0.1:8200/ | head -20",
-      "Browser rendered v0.3.0 verification at 1089x964, 1280x900, 1710x1021, and 390x844",
-      "git diff --cached --check",
-      "git commit -m \"Add speed guide and bump version\""
+      "Browser rendered layout verification at 1089x964, 1280x900, 1710x1021, and 1280x760"
     ],
-    "last_verified_at": "2026-05-28T13:27:59+08:00",
-    "notes": "Head commit 995d8ab carries the latest repository-state update, while the last full runtime verification remains the earlier v0.3.0 check: partial only because Browser screenshot capture was unavailable, so rendered verification used DOM and interaction proof. Typecheck, whitespace diff check, full Vitest suite (97 tests), and production build passed with package version 0.3.0. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser DOM QA confirmed the topbar order is `0/4 testing now | Speed Guide | v0.3.0`, no visible `v0.2.0` remains, there is only one `button.version-pill`, there is no horizontal overflow at 1089x964, 1280x900, 1710x1021, and 390x844, the hidden admin five-click entry still opens `/admin`, and console warnings/errors are empty. The current staged changes are documentation cleanup only and were inspected with Git status and file diffs before commit."
+    "last_verified_at": "2026-05-28T14:05:36+08:00",
+    "notes": "Typecheck, full Vitest suite (97 tests), whitespace diff check for the edited client files, and a production build all passed. The PORT=8200 launchd service was restarted after the build; port 8200 was listening and `/api/health` returned ok. Browser verification at 1089x964, 1280x900, and 1710x1021 kept the one-screen desktop layout without metric-card overlap, while 1280x760 switched to the scroll-safe fallback class before cards could collide with each other or panel borders. Browser console warnings/errors were empty during the rendered checks."
   },
   "attention": [
-    ".ai/status.json is staged as a refreshed snapshot on top of commit 995d8ab.",
-    "Working tree is dirty because the tracked `Ping-Pong-專案說明書.docx` deletion and new `docs/analysis-data-debugging.md` are staged for the next documentation cleanup commit.",
-    "The local branch currently tracks origin/main and was in sync with the remote before this staged documentation cleanup.",
-    "Browser behavior QA passed, but screenshot evidence could not be captured because Browser tab.screenshot timed out on CDP Page.captureScreenshot.",
+    "Working tree is dirty because this layout fix updates `src/client/App.tsx`, `src/client/styles.css`, `README.md`, and `.ai/status.json`.",
+    "The local branch currently tracks origin/main.",
     "The running service uses .env PORT=8200, not the README default 8080.",
+    "The desktop layout now keeps one-screen mode only when the rendered content fits; shorter or zoomed viewports should scroll instead of overlapping cards.",
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
     {
-      "id": "2026-05-28T13:27:59+08:00-docs-spec-cleanup",
-      "at": "2026-05-28T13:27:59+08:00",
-      "kind": "docs",
-      "summary": "Staged deletion of the obsolete project specification files and added the analysis-data debugging note to version control.",
-      "verification": "git status --short --branch; git add -u -- Ping-Pong-專案說明書.docx; git add docs/analysis-data-debugging.md"
+      "id": "2026-05-28T14:05:36+08:00-code-layout-scroll-fallback",
+      "at": "2026-05-28T14:05:36+08:00",
+      "kind": "code",
+      "summary": "Added a rendered-height fallback so desktop keeps one-screen mode only when the homepage fits and otherwise scrolls instead of overlapping cards.",
+      "verification": "npm run typecheck; npm test; npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl -fsS http://127.0.0.1:8200/api/health; Browser QA at 1089x964, 1280x900, 1710x1021, and 1280x760"
     },
     {
       "id": "2026-05-28T13:17:16+08:00-commit-995d8ab",

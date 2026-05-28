@@ -21,7 +21,7 @@ import {
   Wifi,
   X
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import {
   networkLinkTypeLabel,
@@ -87,6 +87,7 @@ export function App() {
 }
 
 function SpeedTestApp() {
+  const appShellRef = useRef<HTMLElement | null>(null);
   const [config, setConfig] = useState<RuntimeConfigResponse | null>(null);
   const [recent, setRecent] = useState<SavedResult[]>([]);
   const [lastSavedResult, setLastSavedResult] = useState<SavedResult | null>(null);
@@ -101,6 +102,7 @@ function SpeedTestApp() {
   const [connectionContext, setConnectionContext] = useState<ConnectionContextState>({ status: "loading", context: null });
   const [isDeletingRecent, setIsDeletingRecent] = useState(false);
   const [activeNoticeIndex, setActiveNoticeIndex] = useState(0);
+  const [viewportLayoutMode, setViewportLayoutMode] = useState<"fit" | "scroll">("fit");
   const adminEntryClickCountRef = useRef(0);
   const adminEntryResetTimerRef = useRef<number | null>(null);
 
@@ -195,6 +197,33 @@ function SpeedTestApp() {
   useEffect(() => {
     setActiveNoticeIndex((index) => Math.min(index, Math.max(warningNotices.length - 1, 0)));
   }, [warningNotices.length]);
+
+  const syncViewportLayoutMode = useEffectEvent(() => {
+    const shell = appShellRef.current;
+    if (!shell) return;
+    const nextMode = shell.scrollHeight > window.innerHeight + 1 ? "scroll" : "fit";
+    setViewportLayoutMode((currentMode) => (currentMode === nextMode ? currentMode : nextMode));
+  });
+
+  useEffect(() => {
+    let frame = window.requestAnimationFrame(syncViewportLayoutMode);
+
+    function handleResize() {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(syncViewportLayoutMode);
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [syncViewportLayoutMode]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(syncViewportLayoutMode);
+    return () => window.cancelAnimationFrame(frame);
+  });
 
   const metrics = useMemo<Metric[]>(
     () => [
@@ -335,7 +364,7 @@ function SpeedTestApp() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell${viewportLayoutMode === "scroll" ? " app-shell-scroll-safe" : ""}`} ref={appShellRef}>
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
