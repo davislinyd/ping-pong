@@ -1,19 +1,19 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-28T15:43:00+08:00",
+  "last_updated": "2026-05-28T16:00:00+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
   "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.1 with browser-scoped Recent Results, fixed homepage Quick 30s and Full 45s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries graded on Stable CV with loosened IQR outlier thresholds, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Extended the Wi-Fi-style 'single weak component lowers stability to Variable, two or more keep it Unstable' leniency to Wired and Unknown links, and gated the P10<50 Mbps hard-poor rule behind any present variability so a slow-but-steady link is diagnosed as low Speed instead of poor Stability.",
-  "next_action": "Review and commit the stability-judging and test-duration updates in `src/client/result-summary.ts`, `src/client/App.tsx`, `test/result-summary.test.ts`, `test/speed-test-worker-client.test.ts`, `README.md`, and `.ai/status.json`.",
+  "latest_summary": "Synced the statistics whitepaper with the new shared usability-aware stability profile (Stable CV as main signal, widened IQR-outlier thresholds, P10<50 hard-poor only with present variability), updated example interpretations, refreshed test-duration mentions to 30s/45s, and replaced history.md with a pointer to .ai/status.json.",
+  "next_action": "Review and commit the doc-sync updates in `docs/speed-test-statistics-whitepaper.md`, `history.md`, and `.ai/status.json`.",
   "git": {
     "branch": "main",
     "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "995d8ab"
+    "commit": "5ad05f4"
   },
   "verification": {
     "status": "verified",
@@ -34,7 +34,7 @@
     "notes": "Typecheck, full Vitest suite (97 tests), whitespace diff check for the edited client files, and a production build all passed. The PORT=8200 launchd service was restarted after the build; port 8200 was listening and `/api/health` returned ok. Browser verification at 1089x964, 1280x900, and 1710x1021 kept the one-screen desktop layout without metric-card overlap, while 1280x760 switched to the scroll-safe fallback class before cards could collide with each other or panel borders. Browser console warnings/errors were empty during the rendered checks."
   },
   "attention": [
-    "Working tree is dirty because the stability-judging and duration updates touch `src/client/result-summary.ts`, `src/client/App.tsx`, `test/result-summary.test.ts`, `test/speed-test-worker-client.test.ts`, `README.md`, and `.ai/status.json`.",
+    "Working tree is dirty because the methodology doc sync touches `docs/speed-test-statistics-whitepaper.md`, `history.md`, and `.ai/status.json`.",
     "The local branch currently tracks origin/main.",
     "The running service uses .env PORT=8200, not the README default 8080.",
     "Stability grading now consumes Stable CV (post-IQR) instead of Raw CV; IQR outlier thresholds widened (Wired 8/15/25%, Wi-Fi 12/22/35%) to stop a single noisy sample from cascading a fast connection to poor.",
@@ -42,6 +42,21 @@
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
+    {
+      "id": "2026-05-28T16:00:00+08:00-docs-whitepaper-sync",
+      "at": "2026-05-28T16:00:00+08:00",
+      "kind": "docs",
+      "summary": "Synced the statistics whitepaper with shared usability-aware stability grading on Stable CV, refreshed 30s/45s test-mode mentions and example interpretations, and replaced history.md with a pointer to .ai/status.json.",
+      "verification": "npm run typecheck; grep sweep for outdated wording; manual diff review"
+    },
+    {
+      "id": "2026-05-28T15:51:17+08:00-commit-5ad05f4",
+      "at": "2026-05-28T15:51:17+08:00",
+      "kind": "commit",
+      "summary": "Committed and pushed stability-grading loosening and Quick/Full duration extension; version bumped to 0.3.1.",
+      "commit": "5ad05f4",
+      "verification": "npm run typecheck; npm test (100 passed); npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl health; git push origin main"
+    },
     {
       "id": "2026-05-28T15:43:00+08:00-code-stability-leniency-shared",
       "at": "2026-05-28T15:43:00+08:00",
@@ -62,22 +77,6 @@
       "kind": "code",
       "summary": "Added a rendered-height fallback so desktop keeps one-screen mode only when the homepage fits and otherwise scrolls instead of overlapping cards.",
       "verification": "npm run typecheck; npm test; npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl -fsS http://127.0.0.1:8200/api/health; Browser QA at 1089x964, 1280x900, 1710x1021, and 1280x760"
-    },
-    {
-      "id": "2026-05-28T13:17:16+08:00-commit-995d8ab",
-      "at": "2026-05-28T13:17:16+08:00",
-      "kind": "commit",
-      "summary": "Committed and pushed repo metadata updates for `.claude/`, AGENTS, and the status snapshot.",
-      "commit": "995d8ab",
-      "verification": "git diff --cached --check -- .ai/status.json .gitignore AGENTS.md; git commit 995d8ab; git push -u origin main"
-    },
-    {
-      "id": "2026-05-26T22:46:20+08:00-commit-479bba0",
-      "at": "2026-05-26T22:46:20+08:00",
-      "kind": "commit",
-      "summary": "Committed the English Speed Guide modal and v0.3.0 version bump.",
-      "commit": "479bba0",
-      "verification": "npm run typecheck; npm test; git diff --check -- package.json package-lock.json README.md src/client/App.tsx src/client/styles.css .ai/status.json; npm run build; restart launchd service on PORT=8200; curl health; Browser DOM/interaction QA at 1089x964, 1280x900, 1710x1021, and 390x844; git diff --cached --check; git commit 479bba0"
     }
   ]
 }

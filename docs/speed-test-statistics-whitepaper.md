@@ -37,12 +37,12 @@
 
 參考實作首頁固定提供兩種測試時間：
 
-- `Quick 20s`：預設模式。適合快速檢查，20 秒通常能取得約 76 筆 post-warmup throughput samples。
-- `Full 30s`：較完整模式。適合正式診斷，30 秒通常能取得約 116 筆 post-warmup throughput samples。
+- `Quick 30s`：預設模式。適合快速檢查，30 秒通常能取得約 116 筆 post-warmup throughput samples。
+- `Full 45s`：較完整模式。適合正式診斷，45 秒通常能取得約 176 筆 post-warmup throughput samples。
 
 這兩個模式只改變保存結果中的 `durationSeconds`。不需要新增 `quick` 或 `full` schema 欄位，因為秒數本身已能描述測試長度。
 
-Admin 或 runtime 設定中的 default duration 仍可保留為 fallback 或 legacy setting。首頁的正式使用者流程固定以 20 秒與 30 秒為入口，避免不同使用者用不同秒數產生難以比較的結果。
+Admin 或 runtime 設定中的 default duration 仍可保留為 fallback 或 legacy setting。首頁的正式使用者流程固定以 30 秒與 45 秒為入口，避免不同使用者用不同秒數產生難以比較的結果。較長的窗口也讓 IQR 過濾與 P10 估計更穩定，並減少短期 TCP 排程雜訊對 Stable CV 的影響。
 
 ### Throughput sampling interval
 
@@ -52,7 +52,7 @@ Admin 或 runtime 設定中的 default duration 仍可保留為 fallback 或 leg
 
 - 太短的時間窗容易放大 JavaScript 排程、HTTP chunk 到達時間、瀏覽器事件 loop 和 TCP burst 的雜訊。
 - 太長的時間窗會掩蓋短暫掉速，降低低速段診斷能力。
-- 250 ms 在 20 到 30 秒測試中能產生足夠樣本，同時維持可解釋的時間解析度。
+- 250 ms 在 30 到 45 秒測試中能產生足夠樣本，同時維持可解釋的時間解析度。
 
 增加樣本數時，優先增加測試時間，而不是縮短 sampling interval。縮短 interval 會提高樣本自相關與排程雜訊，不一定提高統計品質。
 
@@ -319,27 +319,37 @@ Reliability 是最優先的診斷之一，因為封包或 HTTP request 失敗會
 
 ### Stability
 
-Stability 使用四個子指標，但判讀方式依使用者選擇的 link type 分成兩種 profile。`Wired` 與 legacy `Unknown` 使用嚴格 wired-grade stability；`Wi-Fi` 使用 usability-aware stability，保留波動診斷，但避免把仍可用的高吞吐 Wi-Fi 誤判成不可用。
+Stability 使用四個子指標，並對 `Wired`、`Wi-Fi`、legacy `Unknown` 全部套用同一套 **usability-aware 聚合邏輯**。早期版本曾把 Wired 設為嚴格 worst-grade，把 Wi-Fi 設為較寬容；實務上這會讓一條速度充足但有少量波動的 Wired 連線被誤判為不可用，因此目前統一改採可用性為核心的判讀。
 
-Wired 與 Unknown 使用以下門檻，並取最差 grade：
+**主要 CV 訊號採用 Stable CV（IQR 過濾後）而非 Raw CV。** 理由是 stability 是要描述「使用者實際感受到的穩定段」，而 IQR 已經把離群樣本另外算 `outlier rate` 計分；用 Raw CV 等於對同一個現象重複扣分。Raw CV 仍保留在原始診斷欄位中，方便事後分析。
+
+Wired 與 Unknown 使用以下門檻：
 
 | 子指標 | Excellent | Good | Fair | Poor |
 |---|---:|---:|---:|---:|
-| Raw CV | <= 10% | <= 20% | <= 35% | > 35% |
+| Stable CV | <= 5% | <= 10% | <= 20% | > 20% |
 | P10/Mean ratio | >= 85% | >= 70% | >= 50% | < 50% |
-| IQR outlier rate | <= 2% | <= 5% | <= 10% | > 10% |
+| IQR outlier rate | <= 8% | <= 15% | <= 25% | > 25% |
 | Jitter | <= 5 ms | <= 15 ms | <= 30 ms | > 30 ms |
 
 Wi-Fi 使用較符合共享媒介特性的門檻：
 
 | 子指標 | Excellent | Good | Fair | Poor |
 |---|---:|---:|---:|---:|
-| Raw CV | <= 15% | <= 30% | <= 45% | > 45% |
+| Stable CV | <= 8% | <= 18% | <= 30% | > 30% |
 | P10 usability | ratio >= 85% 或 P10 >= 500 Mbps | ratio >= 70% 或 P10 >= 300 Mbps | ratio >= 50% 或 P10 >= 150 Mbps | 其他 |
-| IQR outlier rate | <= 5% | <= 10% | <= 20% | > 20% |
+| IQR outlier rate | <= 12% | <= 22% | <= 35% | > 35% |
 | Jitter | <= 8 ms | <= 20 ms | <= 40 ms | > 40 ms |
 
-Wi-Fi aggregate 不直接取單一最差值。若 jitter 為 poor，或任一方向 P10 低於 50 Mbps，直接判 poor。若兩個以上子指標為 poor，也判 poor。若只有一個子指標為 poor，Stability capped at fair，呈現為 `Wi-Fi variable but usable`。其餘情況使用最差子指標 grade。這保留了 Wi-Fi 波動訊號，但把「可用但波動」和「真的不可用」分開。
+**Aggregate 規則（Wired、Wi-Fi、Unknown 共用）：**
+
+1. 若 jitter 子指標為 poor，直接判 stability poor。
+2. 若任一方向 P10 < 50 Mbps **且** 其他子指標中至少有一項為 fair 或 poor，直接判 stability poor。單獨低 P10 但其他指標皆 excellent，視為「穩定但慢」，由 Speed tier 而非 Stability 反映。
+3. 若兩個以上子指標為 poor，判 stability poor。
+4. 若只有一個子指標為 poor，stability cap 在 fair；呈現為 `Variable`（Wired/Unknown）或 `Wi-Fi variable but usable`（Wi-Fi）。
+5. 其餘情況使用最差子指標 grade。
+
+這套規則同時保留了「真的不穩」的偵測能力，並避免單一邊緣指標把仍堪用的連線拖到不可用。
 
 **P10/Mean ratio** 是 P10 除以 stable mean：
 
@@ -459,7 +469,14 @@ IQR 排除的 outliers：
 310, 290, 270, 250, 230, 210, 190, 170, 150, 130, 110, 90, 70, 820, 900
 ```
 
-判讀：這組資料的 stable mean 是 549.57 Mbps，看起來仍不低；但 P10 只有 262 Mbps，P10/Mean ratio 只有 47.67%，outlier rate 達 15.46%。這表示使用者可能感受到明顯掉速。Raw CV 30.52% 高於 Stable CV 14.89%，代表 IQR 過濾移除了部分波動，但原始 post-startup 資料本身仍不穩定。若這是 Wired 或 Unknown link type，應判為 wired-grade unstable；若這是 Wi-Fi，則更合理的判讀是 `Wi-Fi variable but usable`，因為 P10 絕對值仍有 262 Mbps，沒有 HTTP loss 或高 jitter 時不應直接等同不可用。
+判讀：這組資料的 stable mean 是 549.57 Mbps，看起來仍不低；但 P10 只有 262 Mbps，P10/Mean ratio 只有 47.67%，outlier rate 達 15.46%。這表示使用者可能感受到明顯掉速。Raw CV 30.52% 高於 Stable CV 14.89%，代表 IQR 過濾移除了部分波動，但原始 post-startup 資料本身仍不穩定。
+
+依目前共用的 usability-aware 聚合邏輯（Wired / Wi-Fi / Unknown 一致）：
+
+- **Wired／Unknown**：Stable CV 14.89% → fair；P10/Mean 47.67% → poor；outlier rate 15.46% → fair；jitter 假設 excellent。只有一個子指標 poor，stability cap 在 fair，呈現為 `Variable`、副標 `Throughput variability observed - usable if application experience is acceptable`。
+- **Wi-Fi**：Stable CV 14.89% → good；P10 usability betterGrade(ratio poor, absolute fair) → fair；outlier 15.46% → good；jitter excellent。沒有子指標為 poor，回退到最差為 fair，呈現為 `Wi-Fi variable but usable`。
+
+兩種 link type 都不會把這組資料判成 unstable，但都會明確告訴使用者「能用，但有波動」。
 
 ### 兩組樣本完整表
 
@@ -588,7 +605,7 @@ IQR 排除的 outliers：
 
 以下欄位是參考實作的資料語意，不要求其它專案完全採用相同命名，但建議保留等價資訊：
 
-- `durationSeconds`：測試秒數，例如 20 或 30。
+- `durationSeconds`：測試秒數，例如 30 或 45。
 - `parallelConnections`：有效並行連線數。
 - `networkLinkType`：使用者選擇的 `wired`、`wifi` 或 legacy `unknown`。
 - `testProfile`：`standard` 或 `local-throttled`。
