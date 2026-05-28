@@ -1,19 +1,19 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-28T19:30:00+08:00",
+  "last_updated": "2026-05-28T19:45:00+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
   "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.1 with browser-scoped Recent Results, fixed homepage Quick 30s and Full 45s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries graded on Stable CV with loosened IQR outlier thresholds, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Repointed git origin from git@git.insea.io:lindav/ping-pong.git to https://git.insea.io/twn-general/ping-pong.git so the repo lives under the twn-general namespace.",
-  "next_action": "Create the empty `twn-general/ping-pong` project on git.insea.io, then push main to the new origin.",
+  "latest_summary": "Repointed git origin to https://git.insea.io/twn-general/ping-pong.git under the twn-general namespace; user manually pushed main to the new remote.",
+  "next_action": "Resume normal maintenance against the twn-general/ping-pong origin.",
   "git": {
     "branch": "main",
-    "dirty": true,
+    "dirty": false,
     "remote_tracking": "origin/main",
-    "commit": "5ad05f4"
+    "commit": "7053d00"
   },
   "verification": {
     "status": "verified",
@@ -34,7 +34,7 @@
     "notes": "Typecheck, full Vitest suite (97 tests), whitespace diff check for the edited client files, and a production build all passed. The PORT=8200 launchd service was restarted after the build; port 8200 was listening and `/api/health` returned ok. Browser verification at 1089x964, 1280x900, and 1710x1021 kept the one-screen desktop layout without metric-card overlap, while 1280x760 switched to the scroll-safe fallback class before cards could collide with each other or panel borders. Browser console warnings/errors were empty during the rendered checks."
   },
   "attention": [
-    "Working tree is dirty because the methodology doc sync touches `docs/speed-test-statistics-whitepaper.md`, `history.md`, and `.ai/status.json`.",
+    "Git origin now points at https://git.insea.io/twn-general/ping-pong.git (moved from git@git.insea.io:lindav/ping-pong.git).",
     "The local branch currently tracks origin/main.",
     "The running service uses .env PORT=8200, not the README default 8080.",
     "Stability grading now consumes Stable CV (post-IQR) instead of Raw CV; IQR outlier thresholds widened (Wired 8/15/25%, Wi-Fi 12/22/35%) to stop a single noisy sample from cascading a fast connection to poor.",
@@ -43,11 +43,12 @@
   ],
   "recent_changes": [
     {
-      "id": "2026-05-28T19:30:00+08:00-ops-remote-url-change",
-      "at": "2026-05-28T19:30:00+08:00",
+      "id": "2026-05-28T19:45:00+08:00-ops-remote-url-change",
+      "at": "2026-05-28T19:45:00+08:00",
       "kind": "ops",
-      "summary": "Repointed git origin to https://git.insea.io/twn-general/ping-pong.git so the repo moves under the twn-general namespace. Push deferred until the new project exists on git.insea.io.",
-      "verification": "git remote set-url origin ...; git remote -v"
+      "summary": "Repointed git origin to https://git.insea.io/twn-general/ping-pong.git so the repo lives under the twn-general namespace. User manually pushed main to the new origin.",
+      "commit": "7053d00",
+      "verification": "git remote set-url origin ...; git remote -v; git fetch origin; git status (main in sync with origin/main)"
     },
     {
       "id": "2026-05-28T16:00:00+08:00-docs-whitepaper-sync",
