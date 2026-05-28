@@ -1,19 +1,19 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-28T13:17:16+08:00",
+  "last_updated": "2026-05-28T13:27:59+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
   "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.0 with browser-scoped Recent Results, fixed homepage Quick 20s and Full 30s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Prepared a maintenance metadata follow-up on top of 479bba0: ignore `.claude/`, remove the stale `PROJECT_STATUS.md` handoff rule from AGENTS, and refresh the repo status snapshot.",
-  "next_action": "Commit and push the staged `.ai/status.json`, `.gitignore`, and `AGENTS.md` changes, then decide whether to restore, delete, or replace the tracked project docx and whether the new HTML and debugging note should be versioned.",
+  "latest_summary": "Pushed maintenance metadata commit 995d8ab to origin/main, then staged a documentation cleanup that removes the obsolete project spec files and starts tracking the analysis-data debugging note.",
+  "next_action": "Commit and push the staged `.ai/status.json`, tracked docx deletion, and new `docs/analysis-data-debugging.md` note.",
   "git": {
     "branch": "main",
     "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "479bba0"
+    "commit": "995d8ab"
   },
   "verification": {
     "status": "partial",
@@ -33,24 +33,32 @@
       "git diff --cached --check",
       "git commit -m \"Add speed guide and bump version\""
     ],
-    "last_verified_at": "2026-05-28T13:17:16+08:00",
-    "notes": "Head commit 479bba0 still carries the last full runtime verification: partial only because Browser screenshot capture was unavailable, so rendered verification used DOM and interaction proof. Typecheck, whitespace diff check, full Vitest suite (97 tests), and production build passed with package version 0.3.0. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser DOM QA confirmed the topbar order is `0/4 testing now | Speed Guide | v0.3.0`, no visible `v0.2.0` remains, there is only one `button.version-pill`, there is no horizontal overflow at 1089x964, 1280x900, 1710x1021, and 390x844, the hidden admin five-click entry still opens `/admin`, and console warnings/errors are empty. The current staged follow-up changes are repository metadata and instructions only; they were inspected with Git diff before commit."
+    "last_verified_at": "2026-05-28T13:27:59+08:00",
+    "notes": "Head commit 995d8ab carries the latest repository-state update, while the last full runtime verification remains the earlier v0.3.0 check: partial only because Browser screenshot capture was unavailable, so rendered verification used DOM and interaction proof. Typecheck, whitespace diff check, full Vitest suite (97 tests), and production build passed with package version 0.3.0. The PORT=8200 launchd service was restarted after the final build; port 8200 was listening, /api/health returned ok, and the built homepage HTML loaded. Browser DOM QA confirmed the topbar order is `0/4 testing now | Speed Guide | v0.3.0`, no visible `v0.2.0` remains, there is only one `button.version-pill`, there is no horizontal overflow at 1089x964, 1280x900, 1710x1021, and 390x844, the hidden admin five-click entry still opens `/admin`, and console warnings/errors are empty. The current staged changes are documentation cleanup only and were inspected with Git status and file diffs before commit."
   },
   "attention": [
-    ".ai/status.json is staged as a refreshed snapshot on top of commit 479bba0.",
-    "Working tree remains dirty because the staged `.gitignore` and `AGENTS.md` updates are accompanied by a deleted tracked project docx and two untracked documentation files: `Ping-Pong-Project-Specification.html` and `docs/analysis-data-debugging.md`.",
-    "The current branch tracks origin/main and was in sync with the remote before this staged metadata follow-up.",
+    ".ai/status.json is staged as a refreshed snapshot on top of commit 995d8ab.",
+    "Working tree is dirty because the tracked `Ping-Pong-專案說明書.docx` deletion and new `docs/analysis-data-debugging.md` are staged for the next documentation cleanup commit.",
+    "The local branch currently tracks origin/main and was in sync with the remote before this staged documentation cleanup.",
     "Browser behavior QA passed, but screenshot evidence could not be captured because Browser tab.screenshot timed out on CDP Page.captureScreenshot.",
     "The running service uses .env PORT=8200, not the README default 8080.",
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
     {
-      "id": "2026-05-28T13:17:16+08:00-status-metadata-followup",
+      "id": "2026-05-28T13:27:59+08:00-docs-spec-cleanup",
+      "at": "2026-05-28T13:27:59+08:00",
+      "kind": "docs",
+      "summary": "Staged deletion of the obsolete project specification files and added the analysis-data debugging note to version control.",
+      "verification": "git status --short --branch; git add -u -- Ping-Pong-專案說明書.docx; git add docs/analysis-data-debugging.md"
+    },
+    {
+      "id": "2026-05-28T13:17:16+08:00-commit-995d8ab",
       "at": "2026-05-28T13:17:16+08:00",
-      "kind": "status",
-      "summary": "Staged a metadata follow-up to ignore `.claude/`, remove the stale `PROJECT_STATUS.md` AGENTS reference, and refresh the repo status snapshot.",
-      "verification": "git status --short --branch; git remote -v; git diff --cached -- .ai/status.json .gitignore AGENTS.md"
+      "kind": "commit",
+      "summary": "Committed and pushed repo metadata updates for `.claude/`, AGENTS, and the status snapshot.",
+      "commit": "995d8ab",
+      "verification": "git diff --cached --check -- .ai/status.json .gitignore AGENTS.md; git commit 995d8ab; git push -u origin main"
     },
     {
       "id": "2026-05-26T22:46:20+08:00-commit-479bba0",
@@ -75,14 +83,6 @@
       "summary": "Added link-aware Completion Summary stability judging so Wi-Fi uses a usability-aware profile while Wired and Unknown keep strict worst-grade behavior.",
       "commit": "f138669",
       "verification": "npm test -- test/result-summary.test.ts; npm run typecheck; npm test; npm run build; restart launchd service on PORT=8200; curl health; Browser Wi-Fi homepage QA at 1089x964, 1280x900, 1710x1021, and 390x844"
-    },
-    {
-      "id": "2026-05-26T14:54:04+08:00-push-2a313e0",
-      "at": "2026-05-26T14:54:04+08:00",
-      "kind": "push",
-      "summary": "Committed and pushed the fixed-height warning carousel, marquee behavior, README verification updates, and status snapshot to origin/main.",
-      "commit": "2a313e0",
-      "verification": "git fetch origin main; git diff --cached --check; git commit 2a313e0; git push -u origin main"
     }
   ]
 }
