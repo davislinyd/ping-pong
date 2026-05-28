@@ -70,29 +70,29 @@ describe("speed test worker client", () => {
     await expect(run.promise).rejects.toThrow("Uncaught worker error");
   });
 
-  it("does not time out a 20 second test at the old 35 second limit", async () => {
+  it("does not time out a 30 second test before its watchdog fires", async () => {
     vi.useFakeTimers();
     const worker = new FakeWorker();
-    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 20 }), () => undefined, () => worker);
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), () => undefined, () => worker);
     let rejected = false;
     run.promise.catch(() => {
       rejected = true;
     });
 
-    await vi.advanceTimersByTimeAsync(35_000);
+    await vi.advanceTimersByTimeAsync(60_000);
 
     expect(rejected).toBe(false);
     run.terminate();
     await expect(run.promise).rejects.toThrow("Speed test worker terminated.");
   });
 
-  it("rejects a 20 second test at the full watchdog limit", async () => {
+  it("rejects a 30 second test at the full watchdog limit", async () => {
     vi.useFakeTimers();
     const worker = new FakeWorker();
-    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 20 }), () => undefined, () => worker);
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), () => undefined, () => worker);
     const timeoutExpectation = expect(run.promise).rejects.toThrow("Speed test timed out");
 
-    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(80_000);
 
     await timeoutExpectation;
   });
@@ -100,11 +100,11 @@ describe("speed test worker client", () => {
   it("clears the watchdog when the worker completes before timeout", async () => {
     vi.useFakeTimers();
     const worker = new FakeWorker();
-    const result = baseResult({ durationSeconds: 20 });
+    const result = baseResult({ durationSeconds: 30 });
     const rawData = baseRawData();
-    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 20 }), () => undefined, () => worker);
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), () => undefined, () => worker);
 
-    await vi.advanceTimersByTimeAsync(59_000);
+    await vi.advanceTimersByTimeAsync(79_000);
     worker.emitMessage({ type: "complete", result, rawData });
     await vi.advanceTimersByTimeAsync(1_000);
 

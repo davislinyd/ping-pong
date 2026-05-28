@@ -57,9 +57,9 @@ type ConnectionContextState = {
   status: "loading" | "ready" | "unavailable";
   context: ReportContextResponse | null;
 };
-const TEST_DURATIONS = [20, 30] as const;
+const TEST_DURATIONS = [30, 45] as const;
 type TestDurationSeconds = (typeof TEST_DURATIONS)[number];
-const DEFAULT_TEST_DURATION_SECONDS: TestDurationSeconds = 20;
+const DEFAULT_TEST_DURATION_SECONDS: TestDurationSeconds = 30;
 
 type Metric = {
   label: string;
@@ -696,7 +696,7 @@ function TestDurationSelector({
       {TEST_DURATIONS.map((duration) => (
         <button className={`test-duration-button${selected === duration ? " is-selected" : ""}`} type="button" aria-pressed={selected === duration} disabled={disabled} key={duration} onClick={() => onSelect(duration)}>
           <Clock3 size={15} strokeWidth={2.3} />
-          <span>{duration === 20 ? "Quick" : "Full"}</span>
+          <span>{duration === 30 ? "Quick" : "Full"}</span>
           <strong>{duration}s</strong>
         </button>
       ))}
@@ -917,7 +917,7 @@ function SpeedGuideModal({ onClose }: { onClose: () => void }) {
           <section className="speed-guide-section">
             <h2>How Values Are Collected</h2>
             <p>
-              The test runs in a browser Web Worker. Quick 20s and Full 30s send download, upload, and latency requests to the same intranet service. Each throughput sample converts the bytes observed in its time window into Mbps.
+              The test runs in a browser Web Worker. Quick 30s and Full 45s send download, upload, and latency requests to the same intranet service. Each throughput sample converts the bytes observed in its time window into Mbps.
             </p>
             <p>
               The first segment, up to 1 second, is warmup and is excluded from throughput statistics. After warmup, the first roughly 3% of startup samples are trimmed. The main Download and Upload values use the IQR-filtered stable mean so short spikes or drops do not dominate the headline speed.
@@ -966,24 +966,24 @@ function SpeedGuideModal({ onClose }: { onClose: () => void }) {
               <div>
                 <h3>Wired / Unknown</h3>
                 <ul>
-                  <li>Raw CV: 10 / 20 / 35%</li>
+                  <li>Stable CV: 5 / 10 / 20%</li>
                   <li>P10 / Mean: 85 / 70 / 50%</li>
-                  <li>IQR outlier: 2 / 5 / 10%</li>
+                  <li>IQR outlier: 8 / 15 / 25%</li>
                   <li>Jitter: 5 / 15 / 30 ms</li>
                 </ul>
               </div>
               <div>
                 <h3>Wi-Fi</h3>
                 <ul>
-                  <li>Raw CV: 15 / 30 / 45%</li>
+                  <li>Stable CV: 8 / 18 / 30%</li>
                   <li>P10 ratio or P10: 85 / 70 / 50%, or 500 / 300 / 150 Mbps</li>
-                  <li>IQR outlier: 5 / 10 / 20%</li>
+                  <li>IQR outlier: 12 / 22 / 35%</li>
                   <li>Jitter: 8 / 20 / 40 ms</li>
                 </ul>
               </div>
             </div>
             <p>
-              Wired results use stricter worst-grade judging. Wi-Fi is a shared medium, so a connection can be variable but still usable when throughput remains practical. To isolate wireless environment, device, or signal issues, retest on Wired.
+              Wired and Wi-Fi both use usability-aware stability judging: a single weak component lowers the grade to Variable instead of Unstable, while two or more weak components, poor jitter, or a P10 below 50 Mbps still mark the link Unstable. Wi-Fi additionally checks P10 by absolute Mbps so a high-throughput shared link is not penalised only for being more variable than Wired. To isolate wireless environment, device, or signal issues, retest on Wired.
             </p>
           </section>
 

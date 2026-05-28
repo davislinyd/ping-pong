@@ -37,18 +37,34 @@ describe("completion result summary", () => {
     expect(tile(summary, "Stability")?.value).toBe("Unstable");
   });
 
-  it("uses raw CV to catch unstable Wi-Fi-style throughput even when stable mean is high", () => {
+  it("flags variable throughput as fair via stable CV when only one component is weak", () => {
     const summary = buildCompletionSummary(
       baseResult({
-        downloadStats: stats(820, 900, 960, 50, 5, 36),
-        uploadStats: stats(820, 880, 930, 50, 5, 8)
+        downloadStats: stats(820, 900, 960, 50, 36, 36),
+        uploadStats: stats(820, 880, 930, 50, 8, 8)
+      }),
+      DEFAULT_CAT_SPEED_RANGES
+    );
+
+    expect(summary.title).toBe("Fair connection");
+    expect(summary.primaryLimit).toBe("stability");
+    expect(tile(summary, "Stability")?.value).toBe("Variable");
+    expect(tile(summary, "Stability")?.detail).toContain("36% stable CV");
+  });
+
+  it("marks throughput unstable once two stability components are poor together", () => {
+    const summary = buildCompletionSummary(
+      baseResult({
+        downloadStats: stats(820, 900, 960, 50, 36, 36),
+        uploadStats: stats(820, 880, 930, 50, 8, 8),
+        jitterMs: 38
       }),
       DEFAULT_CAT_SPEED_RANGES
     );
 
     expect(summary.title).toBe("Needs attention");
     expect(summary.primaryLimit).toBe("stability");
-    expect(tile(summary, "Stability")?.detail).toContain("36% raw CV");
+    expect(tile(summary, "Stability")?.value).toBe("Unstable");
   });
 
   it("treats usable but variable Wi-Fi as fair instead of poor", () => {
@@ -67,12 +83,12 @@ describe("completion result summary", () => {
     expect(summary.primaryLimit).toBe("stability");
     expect(summary.subtitle).toBe("Wi-Fi variability observed - usable if application experience is acceptable");
     expect(tile(summary, "Stability")?.value).toBe("Wi-Fi variable but usable");
-    expect(tile(summary, "Stability")?.detail).toContain("30.5% raw CV");
+    expect(tile(summary, "Stability")?.detail).toContain("14.9% stable CV");
     expect(tile(summary, "Stability")?.detail).toContain("P10/mean 47.7%");
     expect(tile(summary, "Stability")?.detail).toContain("15.5% outliers");
   });
 
-  it("keeps the same variable throughput strict for wired links", () => {
+  it("treats variable wired throughput as fair when only one stability component is poor", () => {
     const summary = buildCompletionSummary(
       baseResult({
         networkLinkType: "wired",
@@ -84,13 +100,13 @@ describe("completion result summary", () => {
       DEFAULT_CAT_SPEED_RANGES
     );
 
-    expect(summary.title).toBe("Needs attention");
+    expect(summary.title).toBe("Fair connection");
     expect(summary.primaryLimit).toBe("stability");
-    expect(summary.subtitle).toContain("Check switch, uplink, or server path");
-    expect(tile(summary, "Stability")?.value).toBe("Unstable");
+    expect(summary.subtitle).toBe("Throughput variability observed - usable if application experience is acceptable");
+    expect(tile(summary, "Stability")?.value).toBe("Variable");
   });
 
-  it("keeps legacy unknown links on the strict wired-style profile", () => {
+  it("keeps unknown link types on the same usability-aware stability profile as wired", () => {
     const summary = buildCompletionSummary(
       baseResult({
         networkLinkType: "unknown",
@@ -102,10 +118,10 @@ describe("completion result summary", () => {
       DEFAULT_CAT_SPEED_RANGES
     );
 
-    expect(summary.title).toBe("Needs attention");
+    expect(summary.title).toBe("Fair connection");
     expect(summary.primaryLimit).toBe("stability");
     expect(summary.subtitle).not.toContain("Retry on Wired");
-    expect(tile(summary, "Stability")?.value).toBe("Unstable");
+    expect(tile(summary, "Stability")?.value).toBe("Variable");
   });
 
   it("uses low P10 to mean ratio as a stability bottleneck", () => {
@@ -185,8 +201,8 @@ describe("completion result summary", () => {
     const summary = buildCompletionSummary(
       baseResult({
         networkLinkType: "wifi",
-        downloadStats: stats(820, 900, 960, 50, 5, 48),
-        uploadStats: stats(820, 880, 930, 50, 5, 8)
+        downloadStats: stats(820, 900, 960, 50, 35, 35),
+        uploadStats: stats(820, 880, 930, 50, 8, 8)
       }),
       DEFAULT_CAT_SPEED_RANGES
     );
@@ -234,6 +250,48 @@ describe("completion result summary", () => {
     expect(summary.title).toBe("Needs attention");
     expect(summary.primaryLimit).toBe("speed");
     expect(summary.limitingSide).toBe("upload");
+  });
+
+  it("rates a wired Jog link with high CV but adequate P10 and jitter as fair, not poor", () => {
+    const summary = buildCompletionSummary(
+      baseResult({
+        networkLinkType: "wired",
+        downloadMbps: 159,
+        uploadMbps: 162,
+        downloadStats: stats(82.4, 145, 259, 110, 41.9, 41.9, 106, 159),
+        uploadStats: stats(117, 152, 221, 108, 26.5, 26.5, 104, 162),
+        downloadLoadedLatencyMs: 96.4,
+        uploadLoadedLatencyMs: 29.2,
+        jitterMs: 20,
+        httpLossPercent: 0
+      }),
+      DEFAULT_CAT_SPEED_RANGES
+    );
+
+    expect(summary.title).not.toBe("Needs attention");
+    expect(tile(summary, "Stability")?.value).not.toBe("Unstable");
+    expect(summary.subtitle).not.toContain("Check switch, uplink, or server path");
+  });
+
+  it("rates a wired sprint with low stable CV and modest outliers as good, not poor", () => {
+    const summary = buildCompletionSummary(
+      baseResult({
+        networkLinkType: "wired",
+        downloadMbps: 892,
+        uploadMbps: 859,
+        downloadStats: stats(853, 897, 917, 72, 2.58, 4.8, 69, 892),
+        uploadStats: stats(792, 859, 885, 72, 2.7, 5.28, 64, 859),
+        downloadLoadedLatencyMs: 7.7,
+        uploadLoadedLatencyMs: 6.5,
+        jitterMs: 1.23,
+        httpLossPercent: 0
+      }),
+      DEFAULT_CAT_SPEED_RANGES
+    );
+
+    expect(summary.title).not.toBe("Needs attention");
+    expect(tile(summary, "Stability")?.value).not.toBe("Unstable");
+    expect(tile(summary, "Stability")?.detail).toContain("stable CV");
   });
 
   it("handles legacy or insufficient samples without NaN or a stability penalty", () => {

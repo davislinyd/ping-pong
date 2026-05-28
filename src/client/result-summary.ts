@@ -113,8 +113,8 @@ function speedSummary(result: ResultPayload, ranges: CatSpeedRanges): { tile: Su
 }
 
 function stabilitySummary(download: ThroughputStats, upload: ThroughputStats, jitterMs: number, networkLinkType: NetworkLinkType): { tile: SummaryTile; spread: number | null } {
-  const rawCvValues = [stabilityRawCv(download), stabilityRawCv(upload)].filter((value): value is number => value !== null);
-  if (rawCvValues.length === 0) {
+  const cvValues = [stabilityCv(download), stabilityCv(upload)].filter((value): value is number => value !== null);
+  if (cvValues.length === 0) {
     return {
       spread: null,
       tile: {
@@ -126,24 +126,24 @@ function stabilitySummary(download: ThroughputStats, upload: ThroughputStats, ji
     };
   }
 
-  const rawCv = Math.max(...rawCvValues);
+  const cv = Math.max(...cvValues);
   const p10MeanRatio = minP10MeanRatio(download, upload);
   const outlierRate = maxOutlierRate(download, upload);
   const isWifi = networkLinkType === "wifi";
-  const rawCvGrade = isWifi ? gradeByThreshold(rawCv, 15, 30, 45) : gradeByThreshold(rawCv, 10, 20, 35);
+  const cvGrade = isWifi ? gradeByThreshold(cv, 8, 18, 30) : gradeByThreshold(cv, 5, 10, 20);
   const ratioGrade = isWifi ? wifiP10UsabilityGrade(download, upload) : p10MeanRatio === null ? "excellent" : gradeByMinimum(p10MeanRatio, 0.85, 0.7, 0.5);
-  const outlierGrade = outlierRate === null ? "excellent" : isWifi ? gradeByThreshold(outlierRate, 5, 10, 20) : gradeByThreshold(outlierRate, 2, 5, 10);
+  const outlierGrade = outlierRate === null ? "excellent" : isWifi ? gradeByThreshold(outlierRate, 12, 22, 35) : gradeByThreshold(outlierRate, 8, 15, 25);
   const jitter = safeMetric(jitterMs);
   const jitterGrade = isWifi ? gradeByThreshold(jitter, 8, 20, 40) : gradeByThreshold(jitter, 5, 15, 30);
-  const grade = isWifi ? wifiStabilityGrade([rawCvGrade, ratioGrade, outlierGrade, jitterGrade], jitterGrade, minP10Mbps(download, upload)) : worstGrade([rawCvGrade, ratioGrade, outlierGrade, jitterGrade]);
+  const grade = stabilityGradeWithLeniency([cvGrade, ratioGrade, outlierGrade, jitterGrade], jitterGrade, minP10Mbps(download, upload));
   const value = stabilityValue(grade, networkLinkType);
 
   return {
-    spread: rawCv / 100,
+    spread: cv / 100,
     tile: {
       label: "Stability",
       value,
-      detail: `${formatPercentValue(rawCv)} raw CV, P10/mean ${formatRatioPercent(p10MeanRatio)}, ${formatPercentValue(outlierRate ?? 0)} outliers, ${formatMs(jitter)} jitter`,
+      detail: `${formatPercentValue(cv)} stable CV, P10/mean ${formatRatioPercent(p10MeanRatio)}, ${formatPercentValue(outlierRate ?? 0)} outliers, ${formatMs(jitter)} jitter`,
       grade
     }
   };
@@ -201,8 +201,11 @@ function summarySubtitle(primary: ScoredLimit, limitingSide: LimitingSide, stabi
   }
 
   if (primary.limit === "stability") {
-    if (networkLinkType === "wifi" && stabilityGrade === "fair") {
-      return "Wi-Fi variability observed - usable if application experience is acceptable";
+    if (stabilityGrade === "fair") {
+      if (networkLinkType === "wifi") {
+        return "Wi-Fi variability observed - usable if application experience is acceptable";
+      }
+      return "Throughput variability observed - usable if application experience is acceptable";
     }
     return addLinkDiagnosis(`${stabilityText} - Stability is the main limit`, networkLinkType);
   }
@@ -224,12 +227,12 @@ function addLinkDiagnosis(subtitle: string, networkLinkType: NetworkLinkType): s
   return subtitle;
 }
 
-function stabilityRawCv(stats: ThroughputStats): number | null {
-  if (stats.sampleCount < 3 || !Number.isFinite(stats.rawCvPercent)) {
+function stabilityCv(stats: ThroughputStats): number | null {
+  if (stats.sampleCount < 3 || !Number.isFinite(stats.cvPercent)) {
     return null;
   }
 
-  return stats.rawCvPercent >= 0 ? stats.rawCvPercent : null;
+  return stats.cvPercent >= 0 ? stats.cvPercent : null;
 }
 
 function minP10MeanRatio(download: ThroughputStats, upload: ThroughputStats): number | null {
@@ -305,8 +308,10 @@ function worstGrade(grades: SummaryVerdict[]): SummaryVerdict {
   return grades.reduce((current, candidate) => worseGrade(current, candidate), "excellent");
 }
 
-function wifiStabilityGrade(grades: SummaryVerdict[], jitterGrade: SummaryVerdict, minimumP10Mbps: number | null): SummaryVerdict {
-  if (jitterGrade === "poor" || (minimumP10Mbps !== null && minimumP10Mbps < 50)) {
+function stabilityGradeWithLeniency(grades: SummaryVerdict[], jitterGrade: SummaryVerdict, minimumP10Mbps: number | null): SummaryVerdict {
+  const lowP10Floor = minimumP10Mbps !== null && minimumP10Mbps < 50;
+  const variabilityPresent = grades.some((grade) => grade === "poor" || grade === "fair");
+  if (jitterGrade === "poor" || (lowP10Floor && variabilityPresent)) {
     return "poor";
   }
 
