@@ -48,6 +48,7 @@ import { buildReportSnapshot, downloadReport, type ReportFormat } from "./report
 import { isSpeedTestWorkerAbort } from "./speed-test-worker-client";
 import { iqrKeptDisplay } from "./throughput-display";
 import { useActiveSession } from "./hooks/useActiveSession";
+import { useRetroTheme } from "./hooks/useRetroTheme";
 import { useSpeedTest } from "./hooks/useSpeedTest";
 
 type MetricTone = "teal" | "amber" | "blue" | "rose" | "ink" | "green";
@@ -83,6 +84,7 @@ type WarningNotice = {
 declare const __APP_VERSION__: string;
 
 export function App() {
+  useRetroTheme();
   return window.location.pathname === "/admin" ? <AdminConsole /> : <SpeedTestApp />;
 }
 

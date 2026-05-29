@@ -2637,3 +2637,227 @@ button.server-pill {
     white-space: normal;
   }
 }
+
+/* Konami-code easter egg: NES retro theme, styled after Super Mario Bros (cosmetic only). */
+@font-face {
+  font-family: "VT323";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/vt323.woff2") format("woff2");
+}
+
+:root.retro-nes {
+  /* Super Mario Bros (NES) palette: sky-blue world, white cloud panels, dark text, Mario red, pipe green, coin gold. */
+  --m-bg: #5c94fc;
+  --m-surface: #ffffff;
+  --m-surface-alt: #fff0cc;
+  --m-border: #1c1c1c;
+  --m-text: #1c1c1c;
+  --m-muted: #8a4b00;
+  --m-red: #e52521;
+  --m-green: #2ca800;
+  --m-gold: #fbd000;
+  --m-shadow: 2px 2px 0 rgba(28, 28, 28, 0.55);
+
+  color: var(--m-text);
+  background: var(--m-bg);
+  font-family: "VT323", ui-monospace, "Courier New", monospace;
+  /* Bump the root size once (scales rem-based text). VT323 is condensed, so this stays readable without overflow. */
+  font-size: 19px;
+  image-rendering: pixelated;
+}
+
+:root.retro-nes body {
+  background: var(--m-bg);
+}
+
+/* The larger pixel font makes the one-screen "fit" layout overflow and overlap;
+   let the shell grow to its content and scroll instead of clipping. */
+:root.retro-nes .app-shell {
+  height: auto;
+  min-height: 100vh;
+}
+
+:root.retro-nes :is(.dashboard-shell, .dashboard-stack, .test-panel, .test-panel-main) {
+  min-height: auto;
+}
+
+/* Pixel font is wide; keep the base scale readable but compact enough to fit. */
+:root.retro-nes :where(*) {
+  border-radius: 0;
+  font-family: "VT323", ui-monospace, "Courier New", monospace;
+  letter-spacing: 0;
+  text-shadow: none;
+}
+
+/* Colour only — never set an em font-size on nesting elements (it compounds). */
+:root.retro-nes :is(h1, h2, h3, h4, p, span, strong, em, small, td, th, label, li, a, div, button, input) {
+  color: var(--m-text);
+  line-height: 1.4;
+}
+
+/* Remap metric tone accents to Mario hues so icons/sparklines stay cohesive on white. */
+:root.retro-nes .tone-teal {
+  --tone: #007a00;
+}
+:root.retro-nes .tone-amber {
+  --tone: #d2691e;
+}
+:root.retro-nes .tone-blue {
+  --tone: #1c6cd0;
+}
+:root.retro-nes .tone-rose {
+  --tone: #d01040;
+}
+:root.retro-nes .tone-ink {
+  --tone: #8a4b00;
+}
+:root.retro-nes .tone-green {
+  --tone: #2ca800;
+}
+
+/* Surfaces: white cloud panels with crisp dark outlines. */
+:root.retro-nes :is(
+  .test-panel,
+  .history-panel,
+  .admin-panel,
+  .metric-modal,
+  .notice-card,
+  .speed-test-display,
+  .stage-copy,
+  .connection-summary,
+  .transfer-summary,
+  .completion-summary-tile,
+  .completion-summary-grid,
+  .completion-link-type,
+  .completion-profile,
+  .metric-card,
+  .metric-stat-tile,
+  .metric-stats-strip span,
+  .metric-detail-chart-shell,
+  .metric-detail-tooltip,
+  .speed-guide-tile,
+  .speed-guide-note,
+  .raw-data-table,
+  .raw-data-table th,
+  .raw-data-summary-tile,
+  .raw-data-status,
+  .history-detail-tile,
+  .history-tooltip
+) {
+  background: var(--m-surface);
+  border: 2px solid var(--m-border);
+  box-shadow: var(--m-shadow);
+  color: var(--m-text);
+}
+
+/* Controls: flat blocky buttons in a light brick tone with a gold pressed state. */
+:root.retro-nes :is(
+  .server-pill,
+  .primary-action,
+  .report-action-button,
+  .link-type-button,
+  .test-duration-button,
+  .notice-step-button,
+  .raw-data-tab,
+  .history-delete-button,
+  .metric-modal-close,
+  .history-item,
+  .admin-action,
+  .admin-icon-button,
+  .admin-maintenance button,
+  .admin-maintenance .danger
+) {
+  background: var(--m-surface-alt);
+  border: 2px solid var(--m-border);
+  box-shadow: var(--m-shadow);
+  color: var(--m-text);
+}
+
+/* Primary calls to action take Mario red. */
+:root.retro-nes :is(.primary-action, .admin-action) {
+  background: var(--m-red);
+  color: #ffffff;
+}
+
+:root.retro-nes :is(
+  .server-pill:hover,
+  .report-action-button:hover:not(:disabled),
+  .link-type-button:hover:not(:disabled),
+  .test-duration-button:hover:not(:disabled),
+  .notice-step-button:hover,
+  .raw-data-tab:hover,
+  .metric-card:hover
+) {
+  background: var(--m-gold);
+  color: #1c1c1c;
+}
+
+/* Selected toggles use pipe green. */
+:root.retro-nes :is(.link-type-button.is-selected, .test-duration-button.is-selected, .raw-data-tab.is-selected) {
+  background: var(--m-green);
+  border-color: var(--m-border);
+  color: #ffffff;
+}
+
+/* Destructive actions keep a red warning tone. */
+:root.retro-nes .admin-maintenance .danger {
+  background: var(--m-red);
+  color: #ffffff;
+}
+
+:root.retro-nes :is(.eyebrow, .stage-kicker, .metric-label, .metric-unit, .completion-summary-kicker, .connection-summary span, .transfer-summary-item span, .notice-message, .stage-meta) {
+  color: var(--m-muted);
+}
+
+/* Errors stay legible and warning-coloured on the white panels. */
+:root.retro-nes :is(.error-text, .admin-error, .report-error) {
+  color: #c81000;
+}
+
+:root.retro-nes .brand-mark {
+  background: var(--m-red);
+  border: 2px solid var(--m-border);
+  box-shadow: var(--m-shadow);
+  color: #ffffff;
+}
+
+:root.retro-nes .metric-modal-backdrop {
+  background: rgba(28, 28, 28, 0.55);
+}
+
+/* Keep the giant readout and dense tables from blowing out the layout. */
+:root.retro-nes .speed-number {
+  font-size: 3.4rem;
+  color: var(--m-red);
+}
+
+:root.retro-nes :is(.raw-data-table, .raw-data-table th, .raw-data-table td, .metric-stats-strip, .metric-stats-strip span) {
+  font-size: 0.95rem;
+}
+
+:root.retro-nes :is(input, .admin-field input, .admin-range-row input, .admin-login input) {
+  background: #ffffff;
+  border: 2px solid var(--m-border);
+  color: var(--m-text);
+}
+
+:root.retro-nes :is(:focus-visible) {
+  outline: 2px solid var(--m-red);
+  outline-offset: 2px;
+}
+
+:root.retro-nes :is(.brand-mark svg, .favicon, img) {
+  image-rendering: pixelated;
+}
+
+/* Progress bar: white track with a pipe-green fill. */
+:root.retro-nes .test-progress-track {
+  background: #ffffff;
+  border: 2px solid var(--m-border);
+}
+
+:root.retro-nes .test-progress-fill {
+  background: var(--m-green);
+}

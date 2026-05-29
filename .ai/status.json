@@ -1,37 +1,31 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-28T19:45:00+08:00",
+  "last_updated": "2026-05-29T15:10:00+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
   "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.1 with browser-scoped Recent Results, fixed homepage Quick 30s and Full 45s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries graded on Stable CV with loosened IQR outlier thresholds, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Repointed git origin to https://git.insea.io/twn-general/ping-pong.git under the twn-general namespace; user manually pushed main to the new remote.",
-  "next_action": "Resume normal maintenance against the twn-general/ping-pong origin.",
+  "latest_summary": "Added a Konami-code (up up down down left right left right B A) easter egg that toggles a cosmetic NES retro theme across all pages including /admin, persisted in localStorage; bundled the Press Start 2P pixel font locally. Recoloured the theme after The Legend of Zelda (NES) — black/gold/green/parchment — and fixed an unreadable white-on-white CURRENT STATUS panel (.stage-copy and other light surfaces were not overridden).",
+  "next_action": "Review the uncommitted NES easter-egg changes on branch claude/brave-chatterjee-c02fb5 and commit/push when ready.",
   "git": {
-    "branch": "main",
-    "dirty": false,
+    "branch": "claude/brave-chatterjee-c02fb5",
+    "dirty": true,
     "remote_tracking": "origin/main",
-    "commit": "7053d00"
+    "commit": "cbdbb54"
   },
   "verification": {
     "status": "verified",
     "last_commands": [
-      "git rev-parse --is-inside-work-tree",
-      "git status --short --branch",
-      "git remote -v",
       "npm run typecheck",
       "npm test",
-      "git diff --check -- src/client/App.tsx src/client/styles.css",
-      "npm run build",
-      "launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest",
-      "lsof -nP -iTCP:8200 -sTCP:LISTEN",
-      "curl -fsS http://127.0.0.1:8200/api/health",
-      "Browser rendered layout verification at 1089x964, 1280x900, 1710x1021, and 1280x760"
+      "npm run dev:ui",
+      "Playwright: press up up down down left right left right b a on / and /admin",
+      "Playwright: assert document.documentElement.classList + localStorage 'ping-pong.retroTheme'"
     ],
-    "last_verified_at": "2026-05-28T14:05:36+08:00",
-    "notes": "Typecheck, full Vitest suite (97 tests), whitespace diff check for the edited client files, and a production build all passed. The PORT=8200 launchd service was restarted after the build; port 8200 was listening and `/api/health` returned ok. Browser verification at 1089x964, 1280x900, and 1710x1021 kept the one-screen desktop layout without metric-card overlap, while 1280x760 switched to the scroll-safe fallback class before cards could collide with each other or panel borders. Browser console warnings/errors were empty during the rendered checks."
+    "last_verified_at": "2026-05-29T12:18:00+08:00",
+    "notes": "Typecheck and full Vitest suite (105 tests, incl. new konami-code.test.ts) passed. Drove the Vite UI with Playwright: the Konami sequence on / added the retro-nes class, set localStorage to '1', and switched body background to the NES palette with the Press Start 2P font; the theme survived a reload; pressing the sequence again removed the class and reset storage to '0'; the same sequence on /admin themed the admin console. Layout stayed intact (cosmetic-only). Console errors were only the unreachable remote VITE_API_BASE, unrelated to the theme."
   },
   "attention": [
     "Git origin now points at https://git.insea.io/twn-general/ping-pong.git (moved from git@git.insea.io:lindav/ping-pong.git).",
@@ -42,6 +36,13 @@
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
+    {
+      "id": "2026-05-29T12:28:00+08:00-feat-konami-zelda-theme",
+      "at": "2026-05-29T12:28:00+08:00",
+      "kind": "code",
+      "summary": "Konami-code easter egg toggles a cosmetic retro theme (all pages incl. /admin, localStorage-persisted): konami-code.ts + useRetroTheme hook + konami-code.test.ts. Super Mario Bros (NES) palette (sky-blue bg, white panels, dark text, red/green/gold accents). For readability swapped font Press Start 2P -> VT323 (bundled), set size once on root (19px) and removed a compounding per-element em font-size bug; in retro mode the shell grows to content and scrolls so the larger font no longer overflows/overlaps the one-screen fit layout.",
+      "verification": "npm run typecheck; npm test (105 passed); Playwright full-page screenshot on / confirms legible VT323 Mario layout with no card overlap"
+    },
     {
       "id": "2026-05-28T19:45:00+08:00-ops-remote-url-change",
       "at": "2026-05-28T19:45:00+08:00",
@@ -71,13 +72,7 @@
       "kind": "code",
       "summary": "Wired and Unknown now share the Wi-Fi-style single-weak-component leniency; P10<50 hard-poor rule only fires when other variability is present, so slow-but-steady links land on Speed instead of Stability.",
       "verification": "npm run typecheck; npm test (100 passed); npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl -fsS http://127.0.0.1:8200/api/health"
-    },
-    {
-      "id": "2026-05-28T15:25:00+08:00-code-stability-judging-stable-cv",
-      "at": "2026-05-28T15:25:00+08:00",
-      "kind": "code",
-      "summary": "Stability now grades on Stable CV with looser IQR-outlier thresholds; homepage Quick/Full modes extended from 20s/30s to 30s/45s.",
-      "verification": "npm run typecheck; npm test (98 passed); npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl -fsS http://127.0.0.1:8200/api/health; Browser QA at 1710x1021 and 1089x964 (Speed Guide thresholds and Quick 30s/Full 45s buttons confirmed)"
     }
   ]
 }
+
