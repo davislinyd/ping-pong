@@ -1,3 +1,4 @@
+.ai/
 .claude/
 node_modules/
 dist/
@@ -7,3 +8,6 @@ data/*.sqlite
 data/*.sqlite-*
 .DS_Store
 npm-debug.log*
+CLAUDE.md
+screenshots/
+.env.development

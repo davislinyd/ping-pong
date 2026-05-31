@@ -1,7 +1,7 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-05-29T17:20:00+08:00",
+  "last_updated": "2026-06-01T02:45:00+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
@@ -11,8 +11,8 @@
   "next_action": "Resume normal maintenance on main at version 0.3.2.",
   "git": {
     "branch": "main",
-    "dirty": false,
-    "remote_tracking": "origin/main",
+    "dirty": true,
+    "remote_tracking": "github/main",
     "commit": "5c5b1ef"
   },
   "verification": {
@@ -36,6 +36,14 @@
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
+    {
+      "id": "2026-06-01T02:45:00+08:00-ops-github-push",
+      "at": "2026-06-01T02:45:00+08:00",
+      "kind": "ops",
+      "summary": "Created a new private repository on GitHub (davislinyd/ping-pong) and pushed the local main branch, setting it to track github/main.",
+      "commit": "5c5b1ef",
+      "verification": "gh repo create ping-pong --private --source=. --remote=github --push"
+    },
     {
       "id": "2026-05-29T17:20:00+08:00-release-0.3.2",
       "at": "2026-05-29T17:20:00+08:00",
@@ -65,14 +73,6 @@
       "kind": "docs",
       "summary": "Synced the statistics whitepaper with shared usability-aware stability grading on Stable CV, refreshed 30s/45s test-mode mentions and example interpretations, and replaced history.md with a pointer to .ai/status.json.",
       "verification": "npm run typecheck; grep sweep for outdated wording; manual diff review"
-    },
-    {
-      "id": "2026-05-28T15:51:17+08:00-commit-5ad05f4",
-      "at": "2026-05-28T15:51:17+08:00",
-      "kind": "commit",
-      "summary": "Committed and pushed stability-grading loosening and Quick/Full duration extension; version bumped to 0.3.1.",
-      "commit": "5ad05f4",
-      "verification": "npm run typecheck; npm test (100 passed); npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl health; git push origin main"
     }
   ]
 }
