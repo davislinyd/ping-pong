@@ -1,7 +1,7 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-06-01T11:37:00+08:00",
+  "last_updated": "2026-06-01T11:55:00+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
@@ -13,7 +13,7 @@
     "branch": "main",
     "dirty": false,
     "remote_tracking": "github/main",
-    "commit": "82342ef"
+    "commit": "7219765"
   },
   "verification": {
     "status": "verified",
@@ -33,6 +33,14 @@
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
+    {
+      "id": "2026-06-01T11:55:00+08:00-docs-license-addition",
+      "at": "2026-06-01T11:55:00+08:00",
+      "kind": "docs",
+      "summary": "Added MIT LICENSE file, declared in package.json, and documented in README.md as requested.",
+      "commit": "7219765",
+      "verification": "git add LICENSE package.json README.md; git commit; git push"
+    },
     {
       "id": "2026-06-01T11:37:00+08:00-docs-readme-update",
       "at": "2026-06-01T11:37:00+08:00",
@@ -62,14 +70,6 @@
       "summary": "Updated local .env.development to use localhost and created .env.development.example to document dev API configuration.",
       "commit": "50ee5dd",
       "verification": "git add .env.development.example; git commit; git push github main"
-    },
-    {
-      "id": "2026-06-01T02:49:00+08:00-ops-history-rewritten",
-      "at": "2026-06-01T02:49:00+08:00",
-      "kind": "ops",
-      "summary": "Rewrote Git history using git filter-branch to remove the screenshots directory and .env.development file, then force-pushed to the private GitHub repository.",
-      "commit": "ea3a6c0",
-      "verification": "git filter-branch ...; git gc ...; git push github main --force"
     }
   ]
 }
