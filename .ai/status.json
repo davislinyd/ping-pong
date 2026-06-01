@@ -1,7 +1,7 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-06-01T09:55:00+08:00",
+  "last_updated": "2026-06-01T11:37:00+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
@@ -13,7 +13,7 @@
     "branch": "main",
     "dirty": false,
     "remote_tracking": "github/main",
-    "commit": "7a3cd6d"
+    "commit": "82342ef"
   },
   "verification": {
     "status": "verified",
@@ -33,6 +33,14 @@
     "Local throttled runs are maintenance checks only; a non-local intranet device test is still required to evaluate real network performance."
   ],
   "recent_changes": [
+    {
+      "id": "2026-06-01T11:37:00+08:00-docs-readme-update",
+      "at": "2026-06-01T11:37:00+08:00",
+      "kind": "docs",
+      "summary": "Updated README.md Quick Start guide to detail VITE_API_BASE configurations using the newly added .env.development.example file.",
+      "commit": "82342ef",
+      "verification": "git add README.md; git commit; git push github main"
+    },
     {
       "id": "2026-06-01T09:55:00+08:00-feat-dynamic-speedtest-optimization",
       "at": "2026-06-01T09:55:00+08:00",
@@ -62,14 +70,6 @@
       "summary": "Rewrote Git history using git filter-branch to remove the screenshots directory and .env.development file, then force-pushed to the private GitHub repository.",
       "commit": "ea3a6c0",
       "verification": "git filter-branch ...; git gc ...; git push github main --force"
-    },
-    {
-      "id": "2026-06-01T02:45:00+08:00-ops-github-push",
-      "at": "2026-06-01T02:45:00+08:00",
-      "kind": "ops",
-      "summary": "Created a new private repository on GitHub (davislinyd/ping-pong) and pushed the local main branch, setting it to track github/main.",
-      "commit": "5c5b1ef",
-      "verification": "gh repo create ping-pong --private --source=. --remote=github --push"
     }
   ]
 }
