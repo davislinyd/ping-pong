@@ -71,13 +71,13 @@ describe("runSpeedTest", () => {
   it("rejects immediately when signal is already aborted", async () => {
     const controller = new AbortController();
     controller.abort();
-    await expect(runSpeedTest(testConfig, () => {}, controller.signal)).rejects.toThrow();
+    await expect(runSpeedTest(testConfig, "unknown", () => {}, controller.signal)).rejects.toThrow();
   });
 
   it("rejects when aborted during a test run", async () => {
     stubFetch();
     const controller = new AbortController();
-    const promise = runSpeedTest(testConfig, () => {}, controller.signal);
+    const promise = runSpeedTest(testConfig, "unknown", () => {}, controller.signal);
     await new Promise((r) => setTimeout(r, 50));
     controller.abort();
     await expect(promise).rejects.toThrow();
@@ -89,6 +89,7 @@ describe("runSpeedTest", () => {
 
     await runSpeedTest(
       testConfig,
+      "unknown",
       (p) => {
         if (phases[phases.length - 1] !== p.phase) phases.push(p.phase);
       },
@@ -102,7 +103,7 @@ describe("runSpeedTest", () => {
 
   it("returns a ResultPayload with the correct shape and value ranges", async () => {
     stubFetch();
-    const { result } = await runSpeedTest(testConfig, () => {}, new AbortController().signal);
+    const { result } = await runSpeedTest(testConfig, "unknown", () => {}, new AbortController().signal);
 
     expect(result.durationSeconds).toBe(testConfig.defaultTestDurationSeconds);
     expect(result.parallelConnections).toBe(testConfig.parallelConnections);
@@ -120,7 +121,7 @@ describe("runSpeedTest", () => {
 
   it("returns raw throughput and latency attempts with the summarized result", async () => {
     stubFetch({ failLatency: true });
-    const runResult = await runSpeedTest(testConfig, () => {}, new AbortController().signal);
+    const runResult = await runSpeedTest(testConfig, "unknown", () => {}, new AbortController().signal);
 
     expect(runResult.result.httpLossPercent).toBeGreaterThan(0);
     expect(runResult.rawData.downloadThroughput.length).toBeGreaterThan(0);
@@ -131,7 +132,7 @@ describe("runSpeedTest", () => {
 
   it("reports non-zero HTTP loss when latency calls fail", async () => {
     stubFetch({ failLatency: true });
-    const { result } = await runSpeedTest(testConfig, () => {}, new AbortController().signal);
+    const { result } = await runSpeedTest(testConfig, "unknown", () => {}, new AbortController().signal);
     expect(result.httpLossPercent).toBeGreaterThan(0);
   }, 10_000);
 
@@ -142,6 +143,7 @@ describe("runSpeedTest", () => {
 
     await runSpeedTest(
       testConfig,
+      "unknown",
       (p) => {
         if (typeof p.downloadMegabits === "number" && p.downloadMegabits > 0) sawDownloadMegabits = true;
         if (typeof p.uploadMegabits === "number" && p.uploadMegabits > 0) sawUploadMegabits = true;
@@ -176,7 +178,7 @@ describe("runSpeedTest", () => {
       })
     );
 
-    const { result } = await runSpeedTest({ ...testConfig, parallelConnections: 3 }, () => {}, new AbortController().signal);
+    const { result } = await runSpeedTest({ ...testConfig, parallelConnections: 3 }, "unknown", () => {}, new AbortController().signal);
 
     expect(result.parallelConnections).toBe(3);
     expect(result.testProfile).toBe("standard");
@@ -213,6 +215,7 @@ describe("runSpeedTest", () => {
         parallelConnections: 4,
         localThrottle: { ...DEFAULT_LOCAL_THROTTLE, active: true }
       },
+      "unknown",
       () => {},
       new AbortController().signal
     );

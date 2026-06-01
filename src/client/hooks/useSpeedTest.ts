@@ -94,7 +94,7 @@ export function useSpeedTest(): SpeedTestHook {
 
     let latestTransfer = { download: 0, upload: 0 };
 
-    const workerRun = startSpeedTestWorker(config, (progress: TestProgress) => {
+    const workerRun = startSpeedTestWorker(config, networkLinkType, (progress: TestProgress) => {
       if (testRunIdRef.current !== runId) return;
       setPhase(progress.phase);
       if (progress.currentMbps !== undefined) setCurrentMbps(progress.currentMbps);

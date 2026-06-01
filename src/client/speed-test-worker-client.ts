@@ -1,4 +1,4 @@
-import type { RuntimeConfigResponse } from "../shared/contracts";
+import type { NetworkLinkType, RuntimeConfigResponse } from "../shared/contracts";
 import type { SpeedTestRunResult, TestProgress } from "./speed-test-core";
 import type { SpeedTestWorkerMessage, SpeedTestWorkerRequest } from "./speed-test-worker-protocol";
 
@@ -19,6 +19,7 @@ const SPEED_TEST_TIMEOUT_BUFFER_SECONDS = 20;
 
 export function startSpeedTestWorker(
   config: RuntimeConfigResponse,
+  networkLinkType: NetworkLinkType,
   onProgress: (progress: TestProgress) => void,
   createWorker: CreateSpeedTestWorker = createSpeedTestWorker
 ): RunningSpeedTestWorker {
@@ -74,7 +75,7 @@ export function startSpeedTestWorker(
 
     worker.addEventListener("message", handleMessage);
     worker.addEventListener("error", handleError);
-    worker.postMessage({ type: "start", config });
+    worker.postMessage({ type: "start", config, networkLinkType });
   });
 
   return {

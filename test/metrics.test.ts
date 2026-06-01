@@ -247,4 +247,17 @@ describe("metric helpers", () => {
       })
     ).toEqual(DEFAULT_CAT_SPEED_RANGES);
   });
+
+  it("uses tighter 1.2 IQR fence on wired link type in throughputStatsFromSamples", () => {
+    const samples = [100, 10, 12, 12, 14, 15, 16, 17, 18, 24].map((mbps) => ({
+      bytes: mbps * 125_000,
+      elapsedMs: 1000
+    }));
+
+    const wifiStats = throughputStatsFromSamples(samples, 0, 1000, "wifi");
+    expect(wifiStats.filteredSampleCount).toBe(9);
+
+    const wiredStats = throughputStatsFromSamples(samples, 0, 1000, "wired");
+    expect(wiredStats.filteredSampleCount).toBe(8);
+  });
 });

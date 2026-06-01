@@ -1,4 +1,4 @@
-import type { ResultPayload, RuntimeConfigResponse, TestProfile, ThroughputStats } from "../shared/contracts";
+import type { NetworkLinkType, ResultPayload, RuntimeConfigResponse, TestProfile, ThroughputStats } from "../shared/contracts";
 import { bytesToMegabits, bytesToMbps, filterIqrOutliers, jitter, lossPercent, median, roundTo, throughputStatsFromSamples, type ThroughputSample } from "../shared/metrics";
 import { API_BASE } from "./api-base";
 
@@ -63,6 +63,7 @@ export function createEmptyMetricSeries(): MetricSeries {
 
 export async function runSpeedTest(
   config: RuntimeConfigResponse,
+  networkLinkType: NetworkLinkType,
   onProgress: (progress: TestProgress) => void,
   signal: AbortSignal
 ): Promise<SpeedTestRunResult> {
@@ -95,7 +96,7 @@ export async function runSpeedTest(
       series: cloneMetricSeries(series)
     });
   });
-  const idleLatencyMs = median(filterIqrOutliers(idleLatency.samples));
+  const idleLatencyMs = median(filterIqrOutliers(idleLatency.samples, networkLinkType === "wired" ? 1.2 : 1.5));
   const jitterMs = jitter(idleLatency.samples);
 
   onProgress({
@@ -109,6 +110,7 @@ export async function runSpeedTest(
   onProgress({ phase: "download", label: "Download", currentMbps: null, progressPercent: 0, series: cloneMetricSeries(series) });
   const download = await measureDownload(
     config,
+    networkLinkType,
     signal,
     (currentMbps, phaseProgress) => {
       series.downloadMbps.push(currentMbps);
@@ -138,13 +140,14 @@ export async function runSpeedTest(
     currentMbps: download.mbps,
     progressPercent: 100,
     downloadMegabits: download.megabits,
-    partial: { downloadMbps: download.mbps, downloadStats: download.stats, downloadLoadedLatencyMs: median(filterIqrOutliers(download.loadedLatency.samples)) },
+    partial: { downloadMbps: download.mbps, downloadStats: download.stats, downloadLoadedLatencyMs: median(filterIqrOutliers(download.loadedLatency.samples, networkLinkType === "wired" ? 1.2 : 1.5)) },
     series: cloneMetricSeries(series)
   });
 
   onProgress({ phase: "upload", label: "Upload", currentMbps: null, progressPercent: 0, series: cloneMetricSeries(series) });
   const upload = await measureUpload(
     config,
+    networkLinkType,
     signal,
     (currentMbps, phaseProgress) => {
       series.uploadMbps.push(currentMbps);
@@ -177,13 +180,13 @@ export async function runSpeedTest(
     downloadStats: download.stats,
     uploadStats: upload.stats,
     idleLatencyMs,
-    downloadLoadedLatencyMs: median(filterIqrOutliers(download.loadedLatency.samples)),
-    uploadLoadedLatencyMs: median(filterIqrOutliers(upload.loadedLatency.samples)),
+    downloadLoadedLatencyMs: median(filterIqrOutliers(download.loadedLatency.samples, networkLinkType === "wired" ? 1.2 : 1.5)),
+    uploadLoadedLatencyMs: median(filterIqrOutliers(upload.loadedLatency.samples, networkLinkType === "wired" ? 1.2 : 1.5)),
     jitterMs,
     httpLossPercent: lossPercent(totalSent, totalFailed),
     durationSeconds: config.defaultTestDurationSeconds,
     parallelConnections: effectiveParallelConnections,
-    networkLinkType: "unknown",
+    networkLinkType,
     testProfile
   };
 
@@ -264,6 +267,7 @@ async function latencyOnce(signal: AbortSignal): Promise<number | null> {
 
 async function measureDownload(
   config: RuntimeConfigResponse,
+  networkLinkType: NetworkLinkType,
   signal: AbortSignal,
   onMbps: (currentMbps: number, phaseProgress: number) => void,
   onPhaseProgress?: (phaseProgress: number) => void,
@@ -278,7 +282,8 @@ async function measureDownload(
   const pacer = createTransferPacer(config);
   let measurementBytes = 0;
   const throughputSamples: ThroughputSample[] = [];
-  const sampler = createThroughputSampler(warmupUntil, throughputSamples, onMbps, (now) => phaseProgress(startedAt, stopAt, now));
+  const throughputSampleIntervalMs = networkLinkType === "wired" ? 500 : THROUGHPUT_SAMPLE_INTERVAL_MS;
+  const sampler = createThroughputSampler(warmupUntil, throughputSamples, throughputSampleIntervalMs, onMbps, (now) => phaseProgress(startedAt, stopAt, now));
   const progress = createProgressReporter(startedAt, stopAt, onPhaseProgress);
 
   const loadedLatencyPromise = collectLoadedLatency(stopAt, signal, onLoadedLatencySample);
@@ -323,7 +328,7 @@ async function measureDownload(
   sampler.flush(endedAt);
   const loadedLatency = await loadedLatencyPromise;
   const measurementElapsedMs = Math.max(1, endedAt - warmupUntil);
-  const stats = throughputStatsFromSamples(throughputSamples, measurementBytes, measurementElapsedMs);
+  const stats = throughputStatsFromSamples(throughputSamples, measurementBytes, measurementElapsedMs, networkLinkType);
   const mbps = stats.meanMbps;
   const megabits = bytesToMegabits(measurementBytes);
   onPhaseProgress?.(1);
@@ -334,6 +339,7 @@ async function measureDownload(
 
 async function measureUpload(
   config: RuntimeConfigResponse,
+  networkLinkType: NetworkLinkType,
   signal: AbortSignal,
   onMbps: (currentMbps: number, phaseProgress: number) => void,
   onPhaseProgress?: (phaseProgress: number) => void,
@@ -348,7 +354,8 @@ async function measureUpload(
   const pacer = createTransferPacer(config);
   let measurementBytes = 0;
   const throughputSamples: ThroughputSample[] = [];
-  const sampler = createThroughputSampler(warmupUntil, throughputSamples, onMbps, (now) => phaseProgress(startedAt, stopAt, now));
+  const throughputSampleIntervalMs = networkLinkType === "wired" ? 500 : THROUGHPUT_SAMPLE_INTERVAL_MS;
+  const sampler = createThroughputSampler(warmupUntil, throughputSamples, throughputSampleIntervalMs, onMbps, (now) => phaseProgress(startedAt, stopAt, now));
   const progress = createProgressReporter(startedAt, stopAt, onPhaseProgress);
 
   const loadedLatencyPromise = collectLoadedLatency(stopAt, signal, onLoadedLatencySample);
@@ -397,7 +404,7 @@ async function measureUpload(
   sampler.flush(endedAt);
   const loadedLatency = await loadedLatencyPromise;
   const measurementElapsedMs = Math.max(1, endedAt - warmupUntil);
-  const stats = throughputStatsFromSamples(throughputSamples, measurementBytes, measurementElapsedMs);
+  const stats = throughputStatsFromSamples(throughputSamples, measurementBytes, measurementElapsedMs, networkLinkType);
   const mbps = stats.meanMbps;
   const megabits = bytesToMegabits(measurementBytes);
   onPhaseProgress?.(1);
@@ -409,6 +416,7 @@ async function measureUpload(
 function createThroughputSampler(
   measurementStartedAt: number,
   samples: ThroughputSample[],
+  windowIntervalMs: number,
   onMbps: (currentMbps: number, phaseProgress: number) => void,
   progressAt: (now: number) => number
 ) {
@@ -417,7 +425,7 @@ function createThroughputSampler(
 
   function flush(now: number) {
     const elapsedMs = now - windowStartedAt;
-    if (elapsedMs < THROUGHPUT_SAMPLE_INTERVAL_MS && samples.length > 0) return;
+    if (elapsedMs < windowIntervalMs && samples.length > 0) return;
 
     const sample = { bytes: windowBytes, elapsedMs: Math.max(1, elapsedMs) };
     samples.push(sample);
@@ -429,12 +437,12 @@ function createThroughputSampler(
   return {
     record(bytes: number, now: number) {
       windowBytes += bytes;
-      if (now - windowStartedAt >= THROUGHPUT_SAMPLE_INTERVAL_MS) {
+      if (now - windowStartedAt >= windowIntervalMs) {
         flush(now);
       }
     },
     flush(now: number) {
-      if (windowBytes > 0 || samples.length === 0 || now - windowStartedAt >= THROUGHPUT_SAMPLE_INTERVAL_MS) {
+      if (windowBytes > 0 || samples.length === 0 || now - windowStartedAt >= windowIntervalMs) {
         flush(now);
       }
     }

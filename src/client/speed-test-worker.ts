@@ -19,7 +19,12 @@ workerScope.addEventListener("message", (event: MessageEvent<SpeedTestWorkerRequ
 
   started = true;
   const controller = new AbortController();
-  void runSpeedTest(event.data.config, (progress) => postWorkerMessage({ type: "progress", progress }), controller.signal)
+  void runSpeedTest(
+    event.data.config,
+    event.data.networkLinkType ?? "unknown",
+    (progress) => postWorkerMessage({ type: "progress", progress }),
+    controller.signal
+  )
     .then((runResult) => postWorkerMessage({ type: "complete", result: runResult.result, rawData: runResult.rawData }))
     .catch((error: unknown) => {
       postWorkerMessage({ type: "error", message: errorMessage(error) });

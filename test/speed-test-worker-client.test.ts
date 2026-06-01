@@ -17,9 +17,9 @@ describe("speed test worker client", () => {
     const result = baseResult();
     const rawData = baseRawData();
 
-    const run = startSpeedTestWorker(config, (next) => progress.push(next), () => worker);
+    const run = startSpeedTestWorker(config, "unknown", (next) => progress.push(next), () => worker);
 
-    expect(worker.messages).toEqual([{ type: "start", config }]);
+    expect(worker.messages).toEqual([{ type: "start", config, networkLinkType: "unknown" }]);
 
     worker.emitMessage({ type: "progress", progress: { phase: "download", label: "Download", progressPercent: 25 } });
     worker.emitMessage({ type: "complete", result, rawData });
@@ -33,7 +33,7 @@ describe("speed test worker client", () => {
 
   it("rejects worker errors", async () => {
     const worker = new FakeWorker();
-    const run = startSpeedTestWorker(baseConfig(), () => undefined, () => worker);
+    const run = startSpeedTestWorker(baseConfig(), "unknown", () => undefined, () => worker);
 
     worker.emitMessage({ type: "error", message: "Worker failed" });
 
@@ -43,7 +43,7 @@ describe("speed test worker client", () => {
   it("terminates cleanly and ignores late worker messages", async () => {
     const worker = new FakeWorker();
     const progress: TestProgress[] = [];
-    const run = startSpeedTestWorker(baseConfig(), (next) => progress.push(next), () => worker);
+    const run = startSpeedTestWorker(baseConfig(), "unknown", (next) => progress.push(next), () => worker);
 
     run.terminate();
     worker.emitMessage({ type: "progress", progress: { phase: "upload", label: "Upload", progressPercent: 50 } });
@@ -63,7 +63,7 @@ describe("speed test worker client", () => {
 
   it("rejects uncaught worker runtime errors", async () => {
     const worker = new FakeWorker();
-    const run = startSpeedTestWorker(baseConfig(), () => undefined, () => worker);
+    const run = startSpeedTestWorker(baseConfig(), "unknown", () => undefined, () => worker);
 
     worker.emitError("Uncaught worker error");
 
@@ -73,7 +73,7 @@ describe("speed test worker client", () => {
   it("does not time out a 30 second test before its watchdog fires", async () => {
     vi.useFakeTimers();
     const worker = new FakeWorker();
-    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), () => undefined, () => worker);
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), "unknown", () => undefined, () => worker);
     let rejected = false;
     run.promise.catch(() => {
       rejected = true;
@@ -89,7 +89,7 @@ describe("speed test worker client", () => {
   it("rejects a 30 second test at the full watchdog limit", async () => {
     vi.useFakeTimers();
     const worker = new FakeWorker();
-    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), () => undefined, () => worker);
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), "unknown", () => undefined, () => worker);
     const timeoutExpectation = expect(run.promise).rejects.toThrow("Speed test timed out");
 
     await vi.advanceTimersByTimeAsync(80_000);
@@ -102,7 +102,7 @@ describe("speed test worker client", () => {
     const worker = new FakeWorker();
     const result = baseResult({ durationSeconds: 30 });
     const rawData = baseRawData();
-    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), () => undefined, () => worker);
+    const run = startSpeedTestWorker(baseConfig({ defaultTestDurationSeconds: 30 }), "unknown", () => undefined, () => worker);
 
     await vi.advanceTimersByTimeAsync(79_000);
     worker.emitMessage({ type: "complete", result, rawData });

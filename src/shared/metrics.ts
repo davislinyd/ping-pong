@@ -1,4 +1,4 @@
-import type { ThroughputStats } from "./contracts.js";
+import type { NetworkLinkType, ThroughputStats } from "./contracts.js";
 
 export function roundTo(value: number, digits = 2): number {
   if (!Number.isFinite(value)) return 0;
@@ -49,14 +49,19 @@ export function steadyMbpsFromSamples(samples: ThroughputSample[], fallbackBytes
   return throughputStatsFromSamples(samples, fallbackBytes, fallbackElapsedMs).meanMbps;
 }
 
-export function throughputStatsFromSamples(samples: ThroughputSample[], fallbackBytes: number, fallbackElapsedMs: number): ThroughputStats {
+export function throughputStatsFromSamples(
+  samples: ThroughputSample[],
+  fallbackBytes: number,
+  fallbackElapsedMs: number,
+  networkLinkType?: NetworkLinkType
+): ThroughputStats {
   const mbpsSamples = samples
     .map((sample) => bytesToMbps(sample.bytes, sample.elapsedMs))
     .filter((value) => Number.isFinite(value));
 
   if (mbpsSamples.length > 0) {
     const stableSamples = mbpsSamples.slice(startupDiscardCount(mbpsSamples.length));
-    return statsFromMbpsSamples(stableSamples);
+    return statsFromMbpsSamples(stableSamples, networkLinkType);
   }
 
   const fallbackMbps = bytesToMbps(fallbackBytes, fallbackElapsedMs);
@@ -78,7 +83,7 @@ export function startupDiscardCount(sampleCount: number): number {
   return Math.min(sampleCount - 1, Math.max(1, Math.ceil(sampleCount * 0.03)));
 }
 
-export function classifyThroughputSamples(samples: ThroughputSample[]): ClassifiedThroughputSample[] {
+export function classifyThroughputSamples(samples: ThroughputSample[], networkLinkType?: NetworkLinkType): ClassifiedThroughputSample[] {
   const records = samples.map((sample, index) => ({
     sampleIndex: index + 1,
     bytes: sample.bytes,
@@ -87,7 +92,8 @@ export function classifyThroughputSamples(samples: ThroughputSample[]): Classifi
   }));
   const discardCount = startupDiscardCount(records.length);
   const steadyRecords = records.slice(discardCount);
-  const bounds = iqrBounds(steadyRecords.map((sample) => sample.mbps));
+  const multiplier = networkLinkType === "wired" ? 1.2 : 1.5;
+  const bounds = iqrBounds(steadyRecords.map((sample) => sample.mbps), multiplier);
 
   return records.map((sample, index) => {
     if (index < discardCount) {
@@ -178,20 +184,20 @@ export function quartiles(values: number[]): { q1: number; q3: number; iqr: numb
   return { q1, q3, iqr: q3 - q1 };
 }
 
-function iqrBounds(values: number[]): { lower: number; upper: number } | null {
+function iqrBounds(values: number[], multiplier = 1.5): { lower: number; upper: number } | null {
   const finite = values.filter(Number.isFinite);
   if (finite.length < 4) return null;
   const { q1, q3, iqr } = quartiles(finite);
   return {
-    lower: q1 - 1.5 * iqr,
-    upper: q3 + 1.5 * iqr
+    lower: q1 - multiplier * iqr,
+    upper: q3 + multiplier * iqr
   };
 }
 
-export function filterIqrOutliers(values: number[]): number[] {
+export function filterIqrOutliers(values: number[], multiplier = 1.5): number[] {
   const finite = values.filter(Number.isFinite);
   if (finite.length < 4) return finite;
-  const bounds = iqrBounds(finite);
+  const bounds = iqrBounds(finite, multiplier);
   if (!bounds) return finite;
   return finite.filter((value) => value >= bounds.lower && value <= bounds.upper);
 }
@@ -212,8 +218,9 @@ export function coefficientOfVariation(values: number[]): number {
   return roundTo((standardDeviation(finite) / mean) * 100);
 }
 
-function statsFromMbpsSamples(samples: number[]): ThroughputStats {
-  const filtered = filterIqrOutliers(samples);
+function statsFromMbpsSamples(samples: number[], networkLinkType?: NetworkLinkType): ThroughputStats {
+  const multiplier = networkLinkType === "wired" ? 1.2 : 1.5;
+  const filtered = filterIqrOutliers(samples, multiplier);
   const meanSource = filtered.length > 0 ? filtered : samples;
   const mean = meanSource.reduce((sum, value) => sum + value, 0) / Math.max(1, meanSource.length);
   return {

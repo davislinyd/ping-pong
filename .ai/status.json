@@ -1,31 +1,28 @@
 {
   "name": "Ping Pong",
   "path": "/Users/lindav/git/Ping Pong",
-  "last_updated": "2026-06-01T02:45:00+08:00",
+  "last_updated": "2026-06-01T09:55:00+08:00",
   "phase": "maintenance",
   "health": "stable",
   "status_confidence": "high",
   "status_source": "agent_reported",
-  "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.2 with browser-scoped Recent Results, fixed homepage Quick 30s and Full 45s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries graded on Stable CV with loosened IQR outlier thresholds, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
-  "latest_summary": "Shipped the Konami-code NES easter egg (Super Mario Bros palette, bundled VT323 pixel font) on main and bumped the app version to 0.3.2. Rebuilt dist and restarted the production launchd service on :8200.",
-  "next_action": "Resume normal maintenance on main at version 0.3.2.",
+  "current_goal": "Maintain the single-node intranet speed-test service at app version 0.3.3 with browser-scoped Recent Results, fixed homepage Quick 30s and Full 45s modes, proportional startup trimming, Raw CV and Stable CV throughput diagnostics, IQR kept/outlier-rate card diagnostics, current-run Raw Data popup/CSV diagnostics, a topbar English speed-test guide dialog, stability-first completion summaries graded on Stable CV with loosened IQR outlier thresholds, hotspot data-plan warning, required per-test Wired/Wi-Fi labeling, current connection IP visibility, Web Worker execution, HTML/PNG/Markdown IT diagnostic report export, local-throttled maintenance self-tests, a desktop one-screen dashboard, Admin Console controls, local production health, OctoPulse visibility, and repo-visible reusable documentation.",
+  "latest_summary": "Implemented dynamic connection-type-aware throughput sampling intervals (500ms for Wired, 250ms for Wi-Fi) and IQR multiplier adjustments (1.2 for Wired, 1.5 for Wi-Fi).",
+  "next_action": "Resume normal maintenance on main at version 0.3.3.",
   "git": {
     "branch": "main",
-    "dirty": true,
+    "dirty": false,
     "remote_tracking": "github/main",
-    "commit": "5c5b1ef"
+    "commit": "7a3cd6d"
   },
   "verification": {
     "status": "verified",
     "last_commands": [
       "npm run typecheck",
-      "npm test",
-      "npm run dev:ui",
-      "Playwright: press up up down down left right left right b a on / and /admin",
-      "Playwright: assert document.documentElement.classList + localStorage 'ping-pong.retroTheme'"
+      "npm test"
     ],
-    "last_verified_at": "2026-05-29T12:18:00+08:00",
-    "notes": "Typecheck and full Vitest suite (105 tests, incl. new konami-code.test.ts) passed. Drove the Vite UI with Playwright: the Konami sequence on / added the retro-nes class, set localStorage to '1', and switched body background to the NES palette with the Press Start 2P font; the theme survived a reload; pressing the sequence again removed the class and reset storage to '0'; the same sequence on /admin themed the admin console. Layout stayed intact (cosmetic-only). Console errors were only the unreachable remote VITE_API_BASE, unrelated to the theme."
+    "last_verified_at": "2026-06-01T09:55:00+08:00",
+    "notes": "Verified that all 106 automated tests compile and pass successfully."
   },
   "attention": [
     "Git origin now points at https://git.insea.io/twn-general/ping-pong.git (moved from git@git.insea.io:lindav/ping-pong.git).",
@@ -37,43 +34,42 @@
   ],
   "recent_changes": [
     {
+      "id": "2026-06-01T09:55:00+08:00-feat-dynamic-speedtest-optimization",
+      "at": "2026-06-01T09:55:00+08:00",
+      "kind": "code",
+      "summary": "Implemented dynamic connection-type-aware throughput sampling intervals (500ms for Wired, 250ms for Wi-Fi) and IQR multiplier adjustments (1.2 for Wired, 1.5 for Wi-Fi).",
+      "verification": "npm test"
+    },
+    {
+      "id": "2026-06-01T02:55:00+08:00-docs-readme-version",
+      "at": "2026-06-01T02:55:00+08:00",
+      "kind": "docs",
+      "summary": "Corrected the app version to v0.3.2 in README.md.",
+      "verification": "Manual check of version strings"
+    },
+    {
+      "id": "2026-06-01T02:53:00+08:00-chore-development-example",
+      "at": "2026-06-01T02:53:00+08:00",
+      "kind": "code",
+      "summary": "Updated local .env.development to use localhost and created .env.development.example to document dev API configuration.",
+      "commit": "50ee5dd",
+      "verification": "git add .env.development.example; git commit; git push github main"
+    },
+    {
+      "id": "2026-06-01T02:49:00+08:00-ops-history-rewritten",
+      "at": "2026-06-01T02:49:00+08:00",
+      "kind": "ops",
+      "summary": "Rewrote Git history using git filter-branch to remove the screenshots directory and .env.development file, then force-pushed to the private GitHub repository.",
+      "commit": "ea3a6c0",
+      "verification": "git filter-branch ...; git gc ...; git push github main --force"
+    },
+    {
       "id": "2026-06-01T02:45:00+08:00-ops-github-push",
       "at": "2026-06-01T02:45:00+08:00",
       "kind": "ops",
       "summary": "Created a new private repository on GitHub (davislinyd/ping-pong) and pushed the local main branch, setting it to track github/main.",
       "commit": "5c5b1ef",
       "verification": "gh repo create ping-pong --private --source=. --remote=github --push"
-    },
-    {
-      "id": "2026-05-29T17:20:00+08:00-release-0.3.2",
-      "at": "2026-05-29T17:20:00+08:00",
-      "kind": "commit",
-      "summary": "Bumped app version to 0.3.2 (package.json + lock); committed and pushed to main. Also documented the :8200 production rebuild+restart requirement in CLAUDE.md (untracked local file).",
-      "commit": "5c5b1ef",
-      "verification": "npm run build; launchctl kickstart -k gui/$(id -u)/com.pingpong.speedtest; curl -fsS http://127.0.0.1:8200/api/health; git push origin main"
-    },
-    {
-      "id": "2026-05-29T12:28:00+08:00-feat-konami-zelda-theme",
-      "at": "2026-05-29T12:28:00+08:00",
-      "kind": "code",
-      "summary": "Konami-code easter egg toggles a cosmetic retro theme (all pages incl. /admin, localStorage-persisted): konami-code.ts + useRetroTheme hook + konami-code.test.ts. Super Mario Bros (NES) palette (sky-blue bg, white panels, dark text, red/green/gold accents). For readability swapped font Press Start 2P -> VT323 (bundled), set size once on root (19px) and removed a compounding per-element em font-size bug; in retro mode the shell grows to content and scrolls so the larger font no longer overflows/overlaps the one-screen fit layout.",
-      "verification": "npm run typecheck; npm test (105 passed); Playwright full-page screenshot on / confirms legible VT323 Mario layout with no card overlap"
-    },
-    {
-      "id": "2026-05-28T19:45:00+08:00-ops-remote-url-change",
-      "at": "2026-05-28T19:45:00+08:00",
-      "kind": "ops",
-      "summary": "Repointed git origin to https://git.insea.io/twn-general/ping-pong.git so the repo lives under the twn-general namespace. User manually pushed main to the new origin.",
-      "commit": "7053d00",
-      "verification": "git remote set-url origin ...; git remote -v; git fetch origin; git status (main in sync with origin/main)"
-    },
-    {
-      "id": "2026-05-28T16:00:00+08:00-docs-whitepaper-sync",
-      "at": "2026-05-28T16:00:00+08:00",
-      "kind": "docs",
-      "summary": "Synced the statistics whitepaper with shared usability-aware stability grading on Stable CV, refreshed 30s/45s test-mode mentions and example interpretations, and replaced history.md with a pointer to .ai/status.json.",
-      "verification": "npm run typecheck; grep sweep for outdated wording; manual diff review"
     }
   ]
 }
-

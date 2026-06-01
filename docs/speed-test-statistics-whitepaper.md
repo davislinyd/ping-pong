@@ -46,15 +46,15 @@ Admin 或 runtime 設定中的 default duration 仍可保留為 fallback 或 leg
 
 ### Throughput sampling interval
 
-**Throughput sampling interval** 是每一筆吞吐 sample 覆蓋的時間窗。參考實作使用 250 ms。
+**Throughput sampling interval** 是每一筆吞吐 sample 覆蓋的時間窗。參考實作中採用**動態取樣時間窗**：
 
-250 ms 的設計理由：
+- **Wi-Fi / Unknown**：使用 **250 ms**。
+- **Wired**：使用 **500 ms**，以平滑有線網路在高速下的 JavaScript 排程抖動與 TCP 擁塞控制鋸齒波動。
 
-- 太短的時間窗容易放大 JavaScript 排程、HTTP chunk 到達時間、瀏覽器事件 loop 和 TCP burst 的雜訊。
-- 太長的時間窗會掩蓋短暫掉速，降低低速段診斷能力。
-- 250 ms 在 30 到 45 秒測試中能產生足夠樣本，同時維持可解釋的時間解析度。
+設計理由與調整原則：
 
-增加樣本數時，優先增加測試時間，而不是縮短 sampling interval。縮短 interval 會提高樣本自相關與排程雜訊，不一定提高統計品質。
+- 250 ms 適合無線網路或一般診斷，保留高精度的變異性觀察能力；500 ms 則能有效降低高速有線網路中的微觀排程雜訊與自相關影響。
+- 增加樣本數時，優先增加測試時間，而不是縮短 sampling interval。縮短 interval 會提高樣本自相關與排程雜訊，不一定提高統計品質。
 
 ### Warmup
 
@@ -190,11 +190,16 @@ IQR = Q3 - Q1
 **IQR fence** 是離群值判斷邊界：
 
 ```text
-lowerFence = Q1 - 1.5 * IQR
-upperFence = Q3 + 1.5 * IQR
+lowerFence = Q1 - multiplier * IQR
+upperFence = Q3 + multiplier * IQR
 ```
 
-低於 lowerFence 或高於 upperFence 的樣本稱為 IQR outlier。IQR 過濾不假設資料服從常態分布，因此比平均值加減標準差更適合網路 throughput 這種可能偏態、尖峰、掉速的資料。
+其中 **multiplier（四分位距乘數）** 採用動態設定：
+
+- **Wi-Fi / Unknown**：`multiplier = 1.5`，保留正常的離群判定範圍以反映無線干擾掉速。
+- **Wired**：`multiplier = 1.2`，更嚴格地篩除因系統排程或瀏覽器微觀抖動產生的離群噪訊。
+
+IQR 過濾不假設資料服從常態分布，因此比平均值加減標準差更適合網路 throughput 這種可能偏態、尖峰、掉速的資料。
 
 參考實作中，若可用樣本少於 4 筆，IQR fence 不啟用，因為樣本太少時四分位距不穩定。
 
