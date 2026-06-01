@@ -18,17 +18,18 @@ Local self-tests are blocked by default. Set `ALLOW_LOCAL_SELF_TEST=true` only f
 
 ```bash
 cp .env.example .env
+cp .env.development.example .env.development
 npm install
 npm run dev
 ```
 
-In development mode the Vite frontend and the Fastify API run on separate ports. The browser calls the API directly, so you must tell Vite where the API is. Create `.env.development` next to `.env` and set `VITE_API_BASE` to the API server address:
+In development mode the Vite frontend and the Fastify API run on separate ports. The browser calls the API directly, so you must tell Vite where the API is. You can create `.env.development` by copying `.env.development.example` next to `.env`:
 
 ```text
-VITE_API_BASE=http://<host>:<PORT>
+VITE_API_BASE=http://localhost:8080
 ```
 
-Replace `<host>` with the machine's intranet IP or hostname and `<PORT>` with the value you set in `.env` (default `8080`). The frontend reads this at build time via Vite's `VITE_*` variable injection. Leave the file out or set `VITE_API_BASE=` to use relative URLs, which only works when the browser is on the same machine as the dev server.
+By default it targets `http://localhost:8080`. If you run the API server on a different host or port, replace `localhost` and `8080` accordingly. The frontend reads this at build time via Vite's `VITE_*` variable injection. Leave the file out or set `VITE_API_BASE=` to use relative URLs, which only works when the browser is on the same machine as the dev server.
 
 The API server enables CORS automatically when `NODE_ENV=development` so the browser can reach it across ports without a proxy.
 
