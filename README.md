@@ -248,3 +248,7 @@ Examples are provided in:
 - `docs/com.pingpong.speedtest.plist` for macOS LaunchAgent
 
 For a simple Linux VM deployment, place the project under `/opt/ping-pong`, run `npm ci && npm run build`, copy `.env.example` to `.env`, adjust values, then install the systemd unit.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

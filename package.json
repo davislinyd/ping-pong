@@ -2,6 +2,7 @@
   "name": "ping-pong-intranet-speedtest",
   "version": "0.3.3",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "A single-node intranet network speed test website.",
   "engines": {
